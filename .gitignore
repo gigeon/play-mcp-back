@@ -11,3 +11,7 @@
 *.rar
 hs_err_pid*
 replay_pid*
+/.idea/
+/.gradle/
+/build/
+/gradle/
