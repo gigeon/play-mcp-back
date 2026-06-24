@@ -24,7 +24,7 @@ RUN groupadd -r app && useradd -r -g app app
 COPY --from=build /workspace/build/libs/*.jar app.jar
 USER app
 
-EXPOSE 8765
+EXPOSE 8080
 
 # 컨테이너 메모리에 맞춰 힙 자동 조정
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
