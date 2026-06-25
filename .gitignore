@@ -2,11 +2,9 @@
 *.log
 *.ctxt
 .mtj.tmp/
-*.jar
 *.war
 *.nar
 *.ear
-*.zip
 *.tar.gz
 *.rar
 hs_err_pid*
@@ -14,3 +12,7 @@ replay_pid*
 /.idea/
 /.gradle/
 /build/
+
+# 빌드 산출물 jar 는 제외하되, gradle wrapper jar 는 반드시 포함
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
