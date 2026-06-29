@@ -37,6 +37,7 @@ public class YouthPoilyTool {
 
         param.put("apiKeyNm", apiKeyNm);
         param.put("lclsfNm", lclsfNm);
+        param.put("pageSize", 5);
 
         return apiService.callGet(baseUrl+"/getPlcy", param);
     }
