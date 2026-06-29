@@ -1,5 +1,6 @@
 package play.mcp.back.config;
 
+import org.springaicommunity.mcp.annotation.McpTool;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
@@ -7,6 +8,9 @@ import org.springframework.context.annotation.Configuration;
 
 import play.mcp.back.tools.EchoTool;
 import play.mcp.back.tools.TimeTool;
+import play.mcp.back.tools.YouthPoilyTool;
+
+import java.util.List;
 
 /**
  * {@code @Tool} 이 붙은 빈들을 모아 MCP 서버에 등록한다.
@@ -18,9 +22,9 @@ import play.mcp.back.tools.TimeTool;
 public class McpServerConfig {
 
     @Bean
-    public ToolCallbackProvider mcpTools(EchoTool echoTool, TimeTool timeTool) {
+    public ToolCallbackProvider mcpTools(EchoTool echoTool, TimeTool timeTool, YouthPoilyTool youthPoilyTool) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(echoTool, timeTool)
+                .toolObjects(echoTool, timeTool, youthPoilyTool)
                 .build();
     }
 }
