@@ -1,10 +1,13 @@
 package play.mcp.back.domain.api.service;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 import play.mcp.back.common.BaseMap;
 
@@ -37,5 +40,11 @@ public class ApiService {
                 .body(param)
                 .retrieve()
                 .body(new ParameterizedTypeReference<BaseMap>() {});
+    }
+
+    public String getToken(String key) {
+         HttpServletRequest request = ((ServletRequestAttributes)
+                RequestContextHolder.currentRequestAttributes()).getRequest();
+         return request.getHeader(key);
     }
 }
