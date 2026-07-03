@@ -13,31 +13,33 @@ import play.mcp.back.domain.api.service.ApiService;
 
 @Service
 @RequiredArgsConstructor
-public class YouthPoilyTool {
+public class JobTool {
 
     private final ApiService apiService;
 
-    @Value("${api.youth.baseUrl}")
+    @Value("${api.saramin.baseUrl}")
     private String baseUrl;
 
     @Tool(description = """
-        청년 정책 조회 (온통청년)
+        채용 공고 검색 (사람인)
         
         Args:
-        lclsfNm: 참여권리/복지문화/주거/교육/일자리
+        keyword: 검색 키워드 (예: 백엔드, 신입 개발자, 마케팅)
     """)
-    public BaseMap getYouthPoily(
-            @ToolParam(description = "정책대분류") String lclsfNm
+    public BaseMap searchJobs(
+            @ToolParam(description = "검색 키워드") String keyword
     ) {
         HttpServletRequest request = ((ServletRequestAttributes)
                 RequestContextHolder.currentRequestAttributes()).getRequest();
-        String apiKeyNm = request.getHeader("apiKeyNm");
+        // 사람인 access-key 는 헤더 'saramin-access-key' 로 전달받는다.
+        String accessKey = request.getHeader("saramin-access-key");
 
         BaseMap param = new BaseMap();
-        param.put("apiKeyNm", apiKeyNm);
-        param.put("lclsfNm", lclsfNm);
-        param.put("pageSize", 5);
+        param.put("access-key", accessKey);
+        param.put("keyword", keyword);
+        param.put("count", 5);   // 출력 건수
 
-        return apiService.callGet(baseUrl + "/getPlcy", param);
+        // 사람인은 Accept: application/json 이어야 JSON 으로 응답한다.
+        return apiService.callGet(baseUrl, param, true);
     }
 }

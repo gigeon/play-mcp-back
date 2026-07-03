@@ -1,6 +1,5 @@
 package play.mcp.back.domain.api.service;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -9,7 +8,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import play.mcp.back.common.BaseMap;
 
 import java.net.URI;
-import java.util.Map;
 
 @Service
 public class ApiService {
@@ -19,14 +17,25 @@ public class ApiService {
         this.restClient = builder.build();
     }
 
+    /** 기본 GET 호출 (온통청년 등). */
     public BaseMap callGet(String url, BaseMap param) {
+        return callGet(url, param, false);
+    }
+
+    /**
+     * GET 호출.
+     * @param jsonAccept true 이면 Accept: application/json 헤더를 붙인다 (사람인 API 용).
+     */
+    public BaseMap callGet(String url, BaseMap param, boolean jsonAccept) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
         param.forEach((k, v) -> builder.queryParam(k, v));
         URI uri = builder.build().encode().toUri();   // 한글/특수문자 인코딩
 
-        return restClient.get()
-                .uri(uri)        // 완성된 URI를 통째로 넘김
-                .retrieve()
+        RestClient.RequestHeadersSpec<?> spec = restClient.get().uri(uri);
+        if (jsonAccept) {
+            spec = spec.accept(MediaType.APPLICATION_JSON);
+        }
+        return spec.retrieve()
                 .body(new ParameterizedTypeReference<BaseMap>() {});
     }
 
