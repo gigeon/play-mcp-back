@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -46,5 +48,38 @@ public class ApiService {
          HttpServletRequest request = ((ServletRequestAttributes)
                 RequestContextHolder.currentRequestAttributes()).getRequest();
          return request.getHeader(key);
+    }
+
+    public BaseMap callGet(String url, BaseMap param, String token) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
+        if (param != null) {
+            param.forEach((k, v) -> builder.queryParam(k, String.valueOf(v)));
+        }
+        URI uri = builder.build().encode().toUri();
+
+        return restClient.get()
+                .uri(uri)
+                .header("Authorization", token) // PlayMCP에서 받은 토큰 주입
+                .retrieve()
+                .body(new ParameterizedTypeReference<BaseMap>() {});
+    }
+
+    /**
+     * Header에 토큰을 포함하는 POST 요청 (카카오 톡캘린더 등록용)
+     * 카카오는 기본적으로 Form Url Encoded 방식을 사용합니다.
+     */
+    public BaseMap callPost(String url, BaseMap param, String token) {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        if (param != null) {
+            param.forEach((k, v) -> formData.add(k, String.valueOf(v)));
+        }
+
+        return restClient.post()
+                .uri(url)
+                .header("Authorization", token) // PlayMCP에서 받은 토큰 주입
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED) // 카카오 표준 포맷
+                .body(formData)
+                .retrieve()
+                .body(new ParameterizedTypeReference<BaseMap>() {});
     }
 }
