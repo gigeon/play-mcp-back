@@ -1,14 +1,10 @@
 package play.mcp.back.config;
 
-import org.springaicommunity.mcp.annotation.McpTool;
+import play.mcp.back.common.McpTool;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import play.mcp.back.tools.EchoTool;
-import play.mcp.back.tools.TimeTool;
-import play.mcp.back.tools.YouthPoilyTool;
 
 import java.util.List;
 
@@ -22,9 +18,10 @@ import java.util.List;
 public class McpServerConfig {
 
     @Bean
-    public ToolCallbackProvider mcpTools(EchoTool echoTool, TimeTool timeTool, YouthPoilyTool youthPoilyTool) {
+    public ToolCallbackProvider mcpTools(List<McpTool> tools) {
+        // tools 리스트에는 McpTool을 implements한 모든 @Component 빈들이 자동으로 들어옵니다.
         return MethodToolCallbackProvider.builder()
-                .toolObjects(echoTool, timeTool, youthPoilyTool)
+                .toolObjects(tools.toArray()) // List를 Array로 변환하여 통째로 넘김
                 .build();
     }
 }

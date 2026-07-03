@@ -6,11 +6,12 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import play.mcp.back.common.BaseMap;
+import play.mcp.back.common.McpTool;
 import play.mcp.back.domain.api.service.ApiService;
 
 @Service
 @RequiredArgsConstructor
-public class YouthPoilyTool {
+public class YouthPoilyTool implements McpTool {
 
     private final ApiService apiService;
 
