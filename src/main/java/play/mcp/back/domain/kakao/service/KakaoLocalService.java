@@ -37,22 +37,35 @@ public class KakaoLocalService {
         return adminKey == null || adminKey.isBlank();
     }
 
-    /** 주소 → [경도(x), 위도(y)]. 실패/키없음 시 {@code null}. */
-    public double[] geocode(String address) {
-        if (disabled() || address == null || address.isBlank()) return null;
+    /**
+     * 질의 → [경도(x), 위도(y)]. 실패/키없음 시 {@code null}.
+     *
+     * <p>매물명(건물명)이 섞인 질의는 주소검색(address.json)으로 못 잡히므로
+     * <b>키워드검색(keyword.json)을 먼저</b> 시도해 건물 좌표를 정확히 찾고,
+     * 없으면 주소검색으로 폴백한다(동 단위 근사 좌표).</p>
+     */
+    public double[] geocode(String query) {
+        if (disabled() || query == null || query.isBlank()) return null;
+        double[] byKeyword = search("/v2/local/search/keyword.json", query);
+        return byKeyword != null ? byKeyword : search("/v2/local/search/address.json", query);
+    }
+
+    /** 카카오 검색 API 의 documents[0] 좌표를 반환. 없으면 null. */
+    private double[] search(String path, String query) {
         try {
-            String uri = UriComponentsBuilder.fromUriString(BASE + "/v2/local/search/address.json")
-                    .queryParam("query", address)
-                    .build().encode().toUriString();
+            // 한글 질의는 직접 1회만 URL 인코딩한다(UriComponentsBuilder.encode() 는 이중 인코딩 위험).
+            String q = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
+            String uri = BASE + path + "?query=" + q;
             JsonNode root = get(uri);
             JsonNode docs = root == null ? null : root.path("documents");
             if (docs == null || !docs.isArray() || docs.isEmpty()) return null;
             JsonNode first = docs.get(0);
             double x = Double.parseDouble(first.path("x").asText("0")); // 경도
             double y = Double.parseDouble(first.path("y").asText("0")); // 위도
+            if (x == 0 && y == 0) return null;
             return new double[]{x, y};
         } catch (Exception e) {
-            log.warn("카카오 지오코딩 실패 ({}): {}", address, e.getMessage());
+            log.warn("카카오 좌표검색 실패 ({} · {}): {}", path, query, e.getMessage());
             return null;
         }
     }
@@ -94,8 +107,9 @@ public class KakaoLocalService {
     }
 
     private JsonNode get(String uri) {
+        // 이미 인코딩된 문자열이므로 URI 로 넘겨 RestClient 의 재인코딩(% → %25)을 막는다.
         return restClient.get()
-                .uri(uri)
+                .uri(java.net.URI.create(uri))
                 .header(HttpHeaders.AUTHORIZATION, "KakaoAK " + adminKey)
                 .retrieve()
                 .body(JsonNode.class);

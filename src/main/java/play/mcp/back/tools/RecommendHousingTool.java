@@ -9,6 +9,7 @@ import play.mcp.back.domain.kakao.service.KakaoLocalService;
 import play.mcp.back.domain.loan.service.LoanRuleService;
 import play.mcp.back.domain.loan.service.LoanRuleService.LoanResult;
 import play.mcp.back.domain.realestate.model.Deal;
+import play.mcp.back.domain.realestate.service.LawdCode;
 import play.mcp.back.domain.realestate.service.RealEstateService;
 
 import java.util.ArrayList;
@@ -22,10 +23,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RecommendHousingTool {
 
-    /** 반경(m) 및 반환 개수 상수. */
-    private static final int RADIUS_M = 1000;
+    /** 반경(m) 및 반환 개수 상수. 지하철은 역이 드문 신도시(청라 등) 대응으로 더 넓게 잡는다. */
+    private static final int SUBWAY_RADIUS_M = 3000;
+    private static final int SCHOOL_RADIUS_M = 1500;
     private static final int NEARBY_LIMIT = 3;
-    private static final int MAX_DEALS = 10;
+    private static final int MAX_DEALS = 5;
 
     private final LoanRuleService loanRuleService;
     private final RealEstateService realEstateService;
@@ -66,10 +68,13 @@ public class RecommendHousingTool {
         LoanResult loan = loanRuleService.judge(age, married, income, 0, region);
         int limit = loan.maxLimit();
 
-        // 2) 실거래 조회 → 3) 한도 내 매물 필터
+        // 2) 실거래 조회 → 3) 한도 내 매물 필터 (지역에 '동'이 있으면 그 동만)
         List<Deal> deals = realEstateService.findDeals(region, housingType, dealType);
+        String dong = LawdCode.extractDong(region);
         List<Deal> affordable = deals.stream()
+                .filter(d -> matchesDong(d, dong))
                 .filter(d -> limit <= 0 || d.withinLimit(limit))
+                .sorted(java.util.Comparator.comparingInt(RecommendHousingTool::cost)) // 저렴한 순 = 자기부담 적은 순
                 .limit(MAX_DEALS)
                 .toList();
 
@@ -80,12 +85,25 @@ public class RecommendHousingTool {
             List<NearbyPlace> schools = List.of();
             double[] xy = kakaoLocalService.geocode(d.address() + " " + d.buildingName());
             if (xy != null) {
-                subways = kakaoLocalService.nearby(xy[0], xy[1], KakaoLocalService.SUBWAY, RADIUS_M, NEARBY_LIMIT);
-                schools = kakaoLocalService.nearby(xy[0], xy[1], KakaoLocalService.SCHOOL, RADIUS_M, NEARBY_LIMIT);
+                subways = kakaoLocalService.nearby(xy[0], xy[1], KakaoLocalService.SUBWAY, SUBWAY_RADIUS_M, NEARBY_LIMIT);
+                schools = kakaoLocalService.nearby(xy[0], xy[1], KakaoLocalService.SCHOOL, SCHOOL_RADIUS_M, NEARBY_LIMIT);
             }
             recommended.add(new RecommendedDeal(d, subways, schools));
         }
 
         return new HousingRecommendation(loan, recommended);
+    }
+
+    /** 정렬 기준 비용(만원): 매매는 매매가, 전월세는 보증금. */
+    private static int cost(Deal d) {
+        return "매매".equals(d.dealType()) ? d.price() : d.deposit();
+    }
+
+    /** 요청 동이 없으면 통과, 있으면 매물 주소가 그 동(끝의 '동' 제거 후 부분일치)인지 확인. */
+    private static boolean matchesDong(Deal d, String dong) {
+        if (dong == null || dong.isBlank()) return true;
+        String key = dong.endsWith("동") ? dong.substring(0, dong.length() - 1) : dong;
+        String addr = d.address() == null ? "" : d.address();
+        return addr.contains(key);
     }
 }

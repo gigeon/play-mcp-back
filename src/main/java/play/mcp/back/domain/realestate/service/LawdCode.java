@@ -19,6 +19,8 @@ public final class LawdCode {
     private static final Map<String, Map<String, String>> SIDO = new LinkedHashMap<>();
     /** 시도만 주어졌을 때 대표 시군구 코드. */
     private static final Map<String, String> SIDO_DEFAULT = new LinkedHashMap<>();
+    /** 동 이름 힌트 → 시군구코드(구 없이 동만 준 경우 라우팅용). */
+    private static final Map<String, String> DONG_TO_LAWD = new LinkedHashMap<>();
 
     static {
         Map<String, String> seoul = new LinkedHashMap<>();
@@ -53,6 +55,28 @@ public final class LawdCode {
         busan.put("기장군", "26710");
         SIDO.put("부산", busan);
         SIDO_DEFAULT.put("부산", "26350"); // 해운대구
+
+        // 동 이름 → 시군구코드. 구 없이 동만 준 경우(예: "인천 청라") 올바른 구로 라우팅한다.
+        DONG_TO_LAWD.put("청라", "28275"); DONG_TO_LAWD.put("가정동", "28275"); // 인천 서해구
+        DONG_TO_LAWD.put("검단", "28290"); DONG_TO_LAWD.put("원당동", "28290");
+        DONG_TO_LAWD.put("마전동", "28290"); DONG_TO_LAWD.put("당하동", "28290"); // 인천 검단구
+        DONG_TO_LAWD.put("송도", "28185"); DONG_TO_LAWD.put("청학동", "28185");
+        DONG_TO_LAWD.put("연수동", "28185"); DONG_TO_LAWD.put("옥련동", "28185"); // 인천 연수구
+    }
+
+    /**
+     * 지역 문자열에서 "동"을 추출한다. 결과 매물을 이 동으로 좁히는 데 쓴다.
+     * "청라동" 처럼 동으로 끝나는 토큰, 없으면 알려진 동 힌트(청라·송도 등), 둘 다 없으면 {@code null}.
+     */
+    public static String extractDong(String region) {
+        if (region == null || region.isBlank()) return null;
+        for (String token : region.trim().split("\\s+")) {
+            if (token.length() >= 2 && token.endsWith("동")) return token;
+        }
+        for (String dong : DONG_TO_LAWD.keySet()) {
+            if (region.contains(dong)) return dong;
+        }
+        return null;
     }
 
     /**
@@ -79,13 +103,15 @@ public final class LawdCode {
             }
         }
 
-        // 2) 시도가 특정되면 그 안에서 시군구 검색 → 없으면 시도 대표값
+        // 2) 시도가 특정되면 그 안에서 시군구 검색 → 동 힌트 → 시도 대표값
         if (sido != null) {
             for (Map.Entry<String, String> e : SIDO.get(sido).entrySet()) {
                 if (r.contains(e.getKey())) {
                     return e.getValue();
                 }
             }
+            String byDong = dongHint(r);
+            if (byDong != null) return byDong;
             return SIDO_DEFAULT.get(sido);
         }
 
@@ -96,6 +122,15 @@ public final class LawdCode {
                     return e.getValue();
                 }
             }
+        }
+        // 4) 구도 없이 동만 준 경우(예: "청라") — 동 힌트로 라우팅
+        return dongHint(r);
+    }
+
+    /** 지역 문자열에 알려진 동 힌트가 있으면 해당 시군구코드를 반환. */
+    private static String dongHint(String region) {
+        for (Map.Entry<String, String> e : DONG_TO_LAWD.entrySet()) {
+            if (region.contains(e.getKey())) return e.getValue();
         }
         return null;
     }

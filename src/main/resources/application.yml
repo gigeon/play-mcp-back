@@ -41,7 +41,7 @@ realestate:
 
 # 카카오 로컬 API (매물 인근 지하철/학교). 앱에서 '카카오맵' 활성화해야 동작(안 하면 빈 목록).
 kakao:
-  adminKey: ${KAKAO_ADMIN_KEY:bc4f61564da6250075e36c0497417606}   # 카카오 REST/Admin 키 (Authorization: KakaoAK {key})
+  adminKey: ${KAKAO_ADMIN_KEY:93704fda65973add8e3e275eae3b4fa7}   # 카카오 REST 키 (Authorization: KakaoAK {key})
 
 logging:
   level:
