@@ -15,10 +15,10 @@ public class YouthPoilyTool implements McpTool {
 
     private final ApiService apiService;
 
-    @Value("${api.baseUrl}")
+    @Value("${api.youth.baseUrl}")
     private String baseUrl;
 
-    @Value("${api.key}")
+    @Value("${api.youth.key}")
     private String apiKey;
 
     @Tool(description = """
