@@ -205,4 +205,88 @@ public class YouthPoilyTool implements McpTool {
         out.put("notice", "지자체 정책은 거주기간 등 추가 요건이 있을 수 있습니다. 실제 신청 전 상세 요건을 확인하세요.");
         return out;
     }
+
+    /** 나이 조건 매칭. 연령 정보가 없으면 통과시킨다. */
+    private boolean ageMatches(Map<String, Object> it, int age) {
+        Integer lo = parseInt(it.get("sprtTrgtMinAge"));
+        Integer hi = parseInt(it.get("sprtTrgtMaxAge"));
+        if (lo == null && hi == null) return true;                 // 연령 정보 없음 → 후보 포함
+        if (lo != null && age < lo) return false;
+        if (hi != null && hi > 0 && age > hi) return false;
+        return true;
+    }
+
+    private Integer parseInt(Object o) {
+        if (o == null) return null;
+        try {
+            return Integer.parseInt(str(o).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String str(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
+
+    /** 공통 요청 파라미터(검증된 최소 집합). */
+    private BaseMap baseParam(int pageSize) {
+        BaseMap p = new BaseMap();
+        p.put("apiKeyNm", apiKey);
+        p.put("pageSize", pageSize);
+        return p;
+    }
+
+    private BaseMap callGetPlcy(BaseMap param) {
+        return apiService.callGet(baseUrl + "/getPlcy", param);
+    }
+
+    /* ───────────────────────── 파싱 헬퍼 ───────────────────────── */
+
+    /** 응답 BaseMap 에서 정책 목록(result.youthPolicyList)을 방어적으로 꺼낸다. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> extractList(BaseMap resp) {
+        if (resp == null) return new ArrayList<>();
+        try {
+            Object result = resp.get("result");
+            if (result instanceof Map<?, ?> r) {
+                Object list = ((Map<String, Object>) r).get("youthPolicyList");
+                if (list instanceof List<?> l) {
+                    return (List<Map<String, Object>>) (List<?>) l;
+                }
+            }
+            Object direct = resp.get("youthPolicyList");   // 혹시 최상위에 있는 경우
+            if (direct instanceof List<?> l) {
+                return (List<Map<String, Object>>) (List<?>) l;
+            }
+        } catch (Exception ignored) {
+            // 구조가 다르면 빈 목록 반환 (실제 응답 확인 후 경로 조정)
+        }
+        return new ArrayList<>();
+    }
+
+    private boolean regionMatches(Map<String, Object> it, String region, List<String> userCodes) {
+        if (region == null || region.isBlank()) return true;
+        if ("0054001".equals(str(it.get("pvsnInstGroupCd")))) return true;  // 중앙부처=전국
+
+        if (userCodes != null && !userCodes.isEmpty()) {
+            String zip = str(it.get("zipCd"));
+            if (zip == null || zip.isBlank()) return false;   // 지역코드 없는 지자체 정책은 확정 불가 → 제외
+            for (String token : zip.split(",")) {
+                String t = token.trim();
+                if (t.isEmpty()) continue;
+                for (String uc : userCodes) {
+                    if (uc != null && uc.startsWith(t)) return true;
+                }
+            }
+            return false;
+        }
+
+        // 폴백: 법정동코드 변환 실패 → 기관명 텍스트 매칭
+        for (String key : new String[]{"rgtrInstCdNm", "operInstCdNm", "sprvsnInstCdNm"}) {
+            String v = str(it.get(key));
+            if (v != null && v.contains(region)) return true;
+        }
+        return false;
+    }
 }
