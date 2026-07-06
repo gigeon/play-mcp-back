@@ -31,6 +31,8 @@ management:
 api:
   baseUrl: https://www.youthcenter.go.kr/go/ythip
   key: e92bf925-3d3c-4ef0-8bf9-6e976cc440be
+  # 인증키는 코드에서 사용하지 않는다(각 요청의 헤더 apiKeyNm 을 그대로 전달).
+  youth-key: a10b9e13-ed06-4d20-932b-46b4351fca2a
 
 logging:
   level:
