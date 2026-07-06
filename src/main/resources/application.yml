@@ -32,6 +32,7 @@ api:
   youth:
     baseUrl: https://www.youthcenter.go.kr/go/ythip
     key: e92bf925-3d3c-4ef0-8bf9-6e976cc440be
+
 logging:
   level:
     org.springframework.ai.mcp: INFO
