@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import play.mcp.back.domain.realestate.model.Deal;
+import play.mcp.back.domain.region.service.RegionCodeService;
 
 import java.net.URI;
 import java.time.YearMonth;
@@ -46,6 +47,13 @@ public class MolitRealEstateService implements RealEstateService {
     private final RestClient restClient = RestClient.create();
     private final XmlMapper xmlMapper = new XmlMapper();
 
+    /** 하드코딩 맵(LawdCode)에 없는 지역을 법정동코드 API 로 보완한다. */
+    private final RegionCodeService regionCodeService;
+
+    public MolitRealEstateService(RegionCodeService regionCodeService) {
+        this.regionCodeService = regionCodeService;
+    }
+
     @Value("${realestate.baseUrl}")
     private String baseUrl;
 
@@ -55,9 +63,14 @@ public class MolitRealEstateService implements RealEstateService {
 
     @Override
     public List<Deal> findDeals(String region, String housingType, String dealType) {
+        // 1순위: 하드코딩 맵(서울/인천/부산 + 인천 분구 특수처리 + 5자리 직접입력).
+        // 2순위: 법정동코드 API 로 전국 시군구 보완(대구/경기/제주 등).
         String lawdCd = LawdCode.resolve(region);
         if (lawdCd == null) {
-            log.warn("MOLIT: region '{}' 에 해당하는 LAWD_CD 매핑이 없어 조회를 건너뜁니다.", region);
+            lawdCd = resolveByRegionApi(region);
+        }
+        if (lawdCd == null) {
+            log.warn("MOLIT: region '{}' 의 LAWD_CD 를 찾지 못해 조회를 건너뜁니다.", region);
             return EMPTY;
         }
         if (serviceKey == null || serviceKey.isBlank()) {
@@ -88,6 +101,20 @@ public class MolitRealEstateService implements RealEstateService {
 
     private static String normalizeDealType(String dealType) {
         return "매매".equals(dealType) ? "매매" : "전월세";
+    }
+
+    /**
+     * 하드코딩 맵에 없는 지역을 법정동코드 API 로 조회해 시군구 5자리(LAWD_CD)를 얻는다.
+     * API 는 10자리 region_cd 를 주므로 앞 5자리(시군구)만 취한다. 실패 시 null.
+     */
+    private String resolveByRegionApi(String region) {
+        List<String> codes = regionCodeService.resolveRegionCodesByAddress(region);
+        for (String code : codes) {
+            if (code != null && code.length() >= 5) {
+                return code.substring(0, 5);
+            }
+        }
+        return null;
     }
 
     private List<Deal> query(String endpoint, String lawdCd, YearMonth ym,

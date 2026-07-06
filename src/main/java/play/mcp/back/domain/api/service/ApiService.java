@@ -18,6 +18,11 @@ import java.util.Map;
 
 @Service
 public class ApiService {
+
+    /** BaseMap 응답 타입 참조(익명 클래스 반복 생성 방지). */
+    private static final ParameterizedTypeReference<BaseMap> BASE_MAP =
+            new ParameterizedTypeReference<>() {};
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -25,15 +30,20 @@ public class ApiService {
         this.restClient = builder.build();
     }
 
-    public BaseMap callGet(String url, BaseMap param) {
+    /** url + 쿼리파라미터 → 인코딩된 URI. 한글/특수문자를 안전하게 인코딩한다. */
+    private URI buildUri(String url, BaseMap param) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
-        param.forEach((k, v) -> builder.queryParam(k, v));
-        URI uri = builder.build().encode().toUri();   // 한글/특수문자 인코딩
+        if (param != null) {
+            param.forEach((k, v) -> builder.queryParam(k, v));
+        }
+        return builder.build().encode().toUri();
+    }
 
+    public BaseMap callGet(String url, BaseMap param) {
         return restClient.get()
-                .uri(uri)        // 완성된 URI를 통째로 넘김
+                .uri(buildUri(url, param))
                 .retrieve()
-                .body(new ParameterizedTypeReference<BaseMap>() {});
+                .body(BASE_MAP);
     }
 
     public BaseMap callPost(String url, BaseMap param) {
@@ -42,7 +52,7 @@ public class ApiService {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(param)
                 .retrieve()
-                .body(new ParameterizedTypeReference<BaseMap>() {});
+                .body(BASE_MAP);
     }
 
     public String getToken(String key) {
@@ -52,17 +62,11 @@ public class ApiService {
     }
 
     public BaseMap callGet(String url, BaseMap param, String token) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
-        if (param != null) {
-            param.forEach((k, v) -> builder.queryParam(k, String.valueOf(v)));
-        }
-        URI uri = builder.build().encode().toUri();
-
         return restClient.get()
-                .uri(uri)
+                .uri(buildUri(url, param))
                 .header("Authorization", token) // PlayMCP에서 받은 토큰 주입
                 .retrieve()
-                .body(new ParameterizedTypeReference<BaseMap>() {});
+                .body(BASE_MAP);
     }
 
     /**
@@ -81,16 +85,12 @@ public class ApiService {
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED) // 카카오 표준 포맷
                 .body(formData)
                 .retrieve()
-                .body(new ParameterizedTypeReference<BaseMap>() {});
+                .body(BASE_MAP);
     }
 
     public BaseMap callGetAsMap(String url, BaseMap param) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
-        param.forEach((k, v) -> builder.queryParam(k, v));
-        URI uri = builder.build().encode().toUri();
-
         String body = restClient.get()
-                .uri(uri)
+                .uri(buildUri(url, param))
                 .retrieve()
                 .body(String.class);
 

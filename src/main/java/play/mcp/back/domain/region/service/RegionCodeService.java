@@ -86,8 +86,7 @@ public class RegionCodeService {
      *       "역삼동 테헤란로 123"                → "역삼동"
      *       "경기도 성남시 분당구 정자동 45-6"   → "경기도 성남시 분당구 정자동"
      *
-     * 아직 matchYouthPolicy 흐름에는 연결하지 않은 준비용 메서드다.
-     * (주소 입력을 지원하려면 이 결과를 {@link #resolveRegionCodes(String)} 에 넘기면 된다)
+     * {@link #resolveRegionCodesByAddress(String)} 를 통해 matchYouthPolicy·주택추천에서 사용된다.
      *
      * @return 상세주소를 제거한 행정구역 문자열, 추출 실패 시 원본을 trim 하여 반환
      */
@@ -107,8 +106,8 @@ public class RegionCodeService {
     }
 
     /**
-     * 주소를 정규화(상세주소 제거)한 뒤 법정동코드를 조회하는 편의 메서드. (준비용)
-     * 번지가 붙은 입력에도 대응하려면 {@link #resolveRegionCodes(String)} 대신 이걸 쓰면 된다.
+     * 주소를 정규화(상세주소 제거)한 뒤 법정동코드를 조회하는 편의 메서드.
+     * 번지·도로명이 붙은 전체 주소도 처리되므로 호출부는 이 메서드를 쓴다.
      */
     public List<String> resolveRegionCodesByAddress(String address) {
         return resolveRegionCodes(normalizeAddress(address));

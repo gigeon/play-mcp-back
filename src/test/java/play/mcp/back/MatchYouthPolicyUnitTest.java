@@ -51,7 +51,7 @@ class MatchYouthPolicyUnitTest {
 
         tool = new YouthPoilyTool(apiService, regionCodeService);
         ReflectionTestUtils.setField(tool, "baseUrl", "http://youth");
-        ReflectionTestUtils.setField(tool, "youthApiKey", "k");
+        ReflectionTestUtils.setField(tool, "apiKey", "k");
     }
 
     @Test

@@ -11,8 +11,8 @@ import java.util.List;
 /**
  * {@code @Tool} 이 붙은 빈들을 모아 MCP 서버에 등록한다.
  * <p>
- * 새 도구 클래스를 만들면 여기 toolObjects(...) 에 추가만 하면 된다.
- * (스프링 빈이라면 생성자 주입으로 받아서 넘기면 됨)
+ * {@link McpTool} 을 implements 한 모든 @Component 빈이 자동 수집되므로,
+ * 새 도구 클래스는 {@code implements McpTool} 만 붙이면 별도 등록 없이 노출된다.
  */
 @Configuration
 public class McpServerConfig {
