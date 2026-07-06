@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
+import play.mcp.back.common.McpTool;
 import play.mcp.back.domain.kakao.model.NearbyPlace;
 import play.mcp.back.domain.kakao.service.KakaoLocalService;
 import play.mcp.back.domain.loan.service.LoanRuleService;
@@ -21,7 +22,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-public class RecommendHousingTool {
+public class RecommendHousingTool implements McpTool {
 
     /** 반경(m) 및 반환 개수 상수. 지하철은 역이 드문 신도시(청라 등) 대응으로 더 넓게 잡는다. */
     private static final int SUBWAY_RADIUS_M = 3000;
