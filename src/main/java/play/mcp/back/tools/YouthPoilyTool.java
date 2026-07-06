@@ -63,17 +63,14 @@ public class YouthPoilyTool implements McpTool {
                 """, required = false)
             String zipCd
     ) {
-        BaseMap param = new BaseMap();
-        param.put("apiKeyNm", apiKey);
-        param.put("rtnType", "json");
+        BaseMap param = plcyParam();
         param.put("pageNum", "1");
         param.put("pageSize", "10");
-        if (lclsfNm != null) param.put("lclsfNm", lclsfNm);
-        if (mclsfNm != null) param.put("mclsfNm", mclsfNm);
-        if (keyword != null) param.put("plcyKywdNm", keyword);
-        if (zipCd != null)   param.put("zipCd", zipCd);
-
-        return apiService.callGet(baseUrl, param);
+        putIfPresent(param, "lclsfNm", lclsfNm);
+        putIfPresent(param, "mclsfNm", mclsfNm);
+        putIfPresent(param, "plcyKywdNm", keyword);
+        putIfPresent(param, "zipCd", zipCd);
+        return callGetPlcy(param);
     }
 
     @Tool(description = """
@@ -92,15 +89,12 @@ public class YouthPoilyTool implements McpTool {
             @ToolParam(description = "관심 키워드 (선택)", required = false)
             String keyword
     ) {
-        BaseMap param = new BaseMap();
-        param.put("apiKeyNm", apiKey);
-        param.put("rtnType", "json");
+        BaseMap param = plcyParam();
         param.put("pageNum", "1");
         param.put("pageSize", "50");
-        if (lclsfNm != null) param.put("lclsfNm", lclsfNm);
-        if (keyword != null) param.put("plcyKywdNm", keyword);
-
-        return apiService.callGet(baseUrl, param);
+        putIfPresent(param, "lclsfNm", lclsfNm);
+        putIfPresent(param, "plcyKywdNm", keyword);
+        return callGetPlcy(param);
     }
 
     @Tool(description = """
@@ -113,13 +107,7 @@ public class YouthPoilyTool implements McpTool {
     public BaseMap getPolicyDetail(
             @ToolParam(description = "정책 번호") String plcyNo
     ) {
-        BaseMap param = new BaseMap();
-        param.put("apiKeyNm", apiKey);
-        param.put("rtnType", "json");
-        param.put("plcyNo", plcyNo);
-        param.put("pageType", "2");
-
-        return apiService.callGet(baseUrl, param);
+        return policyDetail(plcyNo);
     }
 
     @Tool(description = """
@@ -130,13 +118,7 @@ public class YouthPoilyTool implements McpTool {
     public BaseMap comparePolicy(
             @ToolParam(description = "비교할 정책 번호 하나") String plcyNo
     ) {
-        BaseMap param = new BaseMap();
-        param.put("apiKeyNm", apiKey);
-        param.put("rtnType", "json");
-        param.put("plcyNo", plcyNo);
-        param.put("pageType", "2");
-
-        return apiService.callGet(baseUrl, param);
+        return policyDetail(plcyNo);
     }
 
     @Tool(description = """
@@ -147,13 +129,7 @@ public class YouthPoilyTool implements McpTool {
     public BaseMap getApplyGuide(
             @ToolParam(description = "정책 번호") String plcyNo
     ) {
-        BaseMap param = new BaseMap();
-        param.put("apiKeyNm", apiKey);
-        param.put("rtnType", "json");
-        param.put("plcyNo", plcyNo);
-        param.put("pageType", "2");
-
-        return apiService.callGet(baseUrl, param);
+        return policyDetail(plcyNo);
     }
 
     @Tool(description = """
@@ -177,10 +153,9 @@ public class YouthPoilyTool implements McpTool {
             @ToolParam(required = false, description = "정책대분류: 일자리/주거/교육/복지문화/참여권리")
             String lclsfNm
     ) {
-        BaseMap p = baseParam(50);   // 넓게 받아서 조건은 서버에서 필터링
-        if (lclsfNm != null && !lclsfNm.isBlank()) {
-            p.put("lclsfNm", lclsfNm);
-        }
+        BaseMap p = plcyParam();     // 넓게 받아서 조건은 서버에서 필터링
+        p.put("pageSize", "50");
+        putIfPresent(p, "lclsfNm", lclsfNm);
         BaseMap resp = callGetPlcy(p);
 
         // 거주지 → 법정동코드(10자리) 변환 (한 번만 조회해서 재사용)
@@ -229,16 +204,32 @@ public class YouthPoilyTool implements McpTool {
         return o == null ? null : String.valueOf(o);
     }
 
-    /** 공통 요청 파라미터(검증된 최소 집합). */
-    private BaseMap baseParam(int pageSize) {
+    /* ───────────────────────── 요청 헬퍼 ───────────────────────── */
+
+    /** 온통청년 API 공통 파라미터(인증키 + JSON 응답). */
+    private BaseMap plcyParam() {
         BaseMap p = new BaseMap();
         p.put("apiKeyNm", apiKey);
-        p.put("pageSize", pageSize);
+        p.put("rtnType", "json");
         return p;
     }
 
+    /** 값이 있을 때만 파라미터에 추가한다. */
+    private void putIfPresent(BaseMap param, String key, String value) {
+        if (value != null && !value.isBlank()) param.put(key, value);
+    }
+
+    /** getPlcy 엔드포인트 호출. */
     private BaseMap callGetPlcy(BaseMap param) {
         return apiService.callGet(baseUrl + "/getPlcy", param);
+    }
+
+    /** 정책번호 하나의 상세(pageType=2) 조회. detail/compare/applyGuide 공통. */
+    private BaseMap policyDetail(String plcyNo) {
+        BaseMap param = plcyParam();
+        param.put("plcyNo", plcyNo);
+        param.put("pageType", "2");
+        return callGetPlcy(param);
     }
 
     /* ───────────────────────── 파싱 헬퍼 ───────────────────────── */
