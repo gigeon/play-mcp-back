@@ -74,59 +74,64 @@ public class RegionCodeService {
         return codes;
     }
 
-    /* ───────────────────── 주소 → 시/구 정규화 (준비용) ───────────────────── */
+    /* ───────────────────── 주소 정규화 (준비용) ───────────────────── */
 
     /**
-     * 자유형식 주소에서 '시도 + 시군구'만 뽑아 정규화한다.
-     * 도로명/지번/상세주소는 버리고 행정구역 상위만 남긴다.
-     *   예) "서울특별시 강남구 역삼동 테헤란로 123"  → "서울특별시 강남구"
-     *       "경기도 성남시 분당구 정자동 45-6"       → "경기도 성남시 분당구"
-     *       "부산 해운대구 우동"                     → "부산 해운대구"
+     * 자유형식 주소에서 번지·도로명 등 상세주소를 떼어내고 행정구역(시/도·시/군/구·읍/면/동/리)만 남긴다.
+     * 앞에서부터 행정구역 토큰을 모으다가, 숫자·도로명 등 행정구역이 아닌 토큰을 만나면 거기서 멈춘다.
+     *   예) "응암동 125-11"                     → "응암동"
+     *       "서울 은평구 응암동 125-11"          → "서울 은평구 응암동"
+     *       "역삼동 테헤란로 123"                → "역삼동"
+     *       "경기도 성남시 분당구 정자동 45-6"   → "경기도 성남시 분당구 정자동"
      *
      * 아직 matchYouthPolicy 흐름에는 연결하지 않은 준비용 메서드다.
      * (주소 입력을 지원하려면 이 결과를 {@link #resolveRegionCodes(String)} 에 넘기면 된다)
      *
-     * @return 정규화된 "시도 [시군구...]" 문자열, 추출 실패 시 원본을 trim 하여 반환
+     * @return 상세주소를 제거한 행정구역 문자열, 추출 실패 시 원본을 trim 하여 반환
      */
-    public String normalizeToSiGu(String address) {
+    public String normalizeAddress(String address) {
         if (address == null || address.isBlank()) return "";
 
         List<String> parts = new ArrayList<>();
         for (String token : address.trim().split("\\s+")) {
-            if (isSido(token)) {
-                parts.clear();          // 시도가 나오면 그 앞의 잡토큰은 버리고 새로 시작
-                parts.add(token);
-            } else if (isSiGunGu(token) && !parts.isEmpty()) {
-                parts.add(token);       // 시도 뒤에 오는 시/군/구 (성남시 분당구처럼 2단계도 누적)
+            if (isAdminToken(token)) {
+                parts.add(token);       // 시/도·시/군/구·읍/면/동/리 토큰은 유지
             } else if (!parts.isEmpty()) {
-                break;                  // 시/군/구 뒤 첫 비행정구역 토큰(동/도로명 등)에서 종료
+                break;                  // 행정구역 뒤 첫 상세주소(번지/도로명 등)에서 종료
             }
+            // parts 가 비어있는 동안의 비행정구역 토큰(선행 잡토큰)은 건너뛴다
         }
         return parts.isEmpty() ? address.trim() : String.join(" ", parts);
     }
 
     /**
-     * 주소를 시/구 단위로 정규화한 뒤 법정동코드를 조회하는 편의 메서드. (준비용)
-     * 상세주소가 붙은 입력에도 대응하려면 {@link #resolveRegionCodes(String)} 대신 이걸 쓰면 된다.
+     * 주소를 정규화(상세주소 제거)한 뒤 법정동코드를 조회하는 편의 메서드. (준비용)
+     * 번지가 붙은 입력에도 대응하려면 {@link #resolveRegionCodes(String)} 대신 이걸 쓰면 된다.
      */
     public List<String> resolveRegionCodesByAddress(String address) {
-        return resolveRegionCodes(normalizeToSiGu(address));
+        return resolveRegionCodes(normalizeAddress(address));
     }
 
-    /** 시도 토큰 여부 (특별시/광역시/특별자치시/특별자치도/도, 축약형 '서울'·'부산' 등 포함). */
-    private boolean isSido(String token) {
-        if (token == null) return false;
-        return token.endsWith("특별시") || token.endsWith("광역시")
-                || token.endsWith("특별자치시") || token.endsWith("특별자치도")
-                || token.endsWith("도")
-                || SIDO_ABBR.contains(token);
+    /**
+     * 행정구역 토큰 여부.
+     * 시/도 축약형(서울·부산…) 또는 행정구역 접미사(도/시/군/구/읍/면/동/리/가)로 끝나면 참.
+     * 도로명(로/길)·번지·숫자 토큰은 접미사가 걸리지 않아 자연히 제외된다.
+     * ('역삼1동'처럼 숫자가 섞인 동 이름도 접미사로 판정되어 유지됨)
+     */
+    private boolean isAdminToken(String token) {
+        if (token == null || token.isEmpty()) return false;
+        if (SIDO_ABBR.contains(token)) return true;
+        for (String suffix : ADMIN_SUFFIXES) {
+            if (token.endsWith(suffix)) return true;
+        }
+        return false;
     }
 
-    /** 시/군/구 토큰 여부. (시도 축약형과 겹치지 않도록 축약형은 제외) */
-    private boolean isSiGunGu(String token) {
-        if (token == null || SIDO_ABBR.contains(token)) return false;
-        return token.endsWith("시") || token.endsWith("군") || token.endsWith("구");
-    }
+    /** 행정구역 접미사 (긴 접미사 우선). */
+    private static final List<String> ADMIN_SUFFIXES = List.of(
+            "특별자치시", "특별자치도", "특별시", "광역시",
+            "도", "시", "군", "구", "읍", "면", "동", "리", "가"
+    );
 
     /** 시도 축약 표기 (사용자가 '서울 강남구'처럼 짧게 입력하는 경우). */
     private static final List<String> SIDO_ABBR = List.of(
