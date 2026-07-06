@@ -32,14 +32,6 @@ api:
   youth:
     baseUrl: https://www.youthcenter.go.kr/go/ythip
     key: e92bf925-3d3c-4ef0-8bf9-6e976cc440be
-
-  kakao:
-    url: https://kapi.kakao.com/v2/api/talk/calendar
-
-playmcp: # 또는 kakao: , oauth: 등
-  client-id: 186eb31ed63a80833f79e42687a21ee8  # <--- 이 값이 서버 쪽에 들어가 있어야 합니다!
-  client-secret: 47sfhZRyfIlEFhKNiu1Pn2IBryUGCdnd
-
 logging:
   level:
     org.springframework.ai.mcp: INFO

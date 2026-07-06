@@ -1,9 +1,9 @@
-FROM gradle:8.10.2-jdk17 AS build
+FROM gradle:8.10.2-jdk23 AS build
 WORKDIR /workspace
 COPY . .
 RUN gradle bootJar --no-daemon
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:23-jre
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar app.jar
 EXPOSE 8000
