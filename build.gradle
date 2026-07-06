@@ -29,6 +29,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.jetbrains:annotations:15.0'
 
+    // MOLIT 실거래가 API 응답(XML) 파싱용
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 

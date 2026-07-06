@@ -1,0 +1,37 @@
+[
+  {
+    "type": "오피스텔", "dealType": "전세", "address": "서울 강남구 역삼동",
+    "buildingName": "역삼푸르지오시티", "deposit": 9500, "monthlyRent": 0,
+    "price": 0, "areaM2": 24, "dealYmd": "202406", "lawdCd": "11680"
+  },
+  {
+    "type": "오피스텔", "dealType": "전세", "address": "서울 강남구 논현동",
+    "buildingName": "논현아이파크", "deposit": 18000, "monthlyRent": 0,
+    "price": 0, "areaM2": 33, "dealYmd": "202405", "lawdCd": "11680"
+  },
+  {
+    "type": "오피스텔", "dealType": "월세", "address": "서울 강남구 삼성동",
+    "buildingName": "삼성센트럴", "deposit": 2000, "monthlyRent": 90,
+    "price": 0, "areaM2": 26, "dealYmd": "202406", "lawdCd": "11680"
+  },
+  {
+    "type": "빌라", "dealType": "전세", "address": "서울 마포구 망원동",
+    "buildingName": "망원빌라", "deposit": 8000, "monthlyRent": 0,
+    "price": 0, "areaM2": 42, "dealYmd": "202404", "lawdCd": "11440"
+  },
+  {
+    "type": "빌라", "dealType": "매매", "address": "서울 마포구 연남동",
+    "buildingName": "연남하우스", "deposit": 0, "monthlyRent": 0,
+    "price": 34000, "areaM2": 45, "dealYmd": "202405", "lawdCd": "11440"
+  },
+  {
+    "type": "아파트", "dealType": "전세", "address": "서울 노원구 상계동",
+    "buildingName": "상계주공", "deposit": 19500, "monthlyRent": 0,
+    "price": 0, "areaM2": 49, "dealYmd": "202406", "lawdCd": "11350"
+  },
+  {
+    "type": "아파트", "dealType": "매매", "address": "서울 노원구 중계동",
+    "buildingName": "중계그린", "deposit": 0, "monthlyRent": 0,
+    "price": 58000, "areaM2": 59, "dealYmd": "202403", "lawdCd": "11350"
+  }
+]

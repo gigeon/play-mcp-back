@@ -33,6 +33,17 @@ api:
     baseUrl: https://www.youthcenter.go.kr/go/ythip
     key: e92bf925-3d3c-4ef0-8bf9-6e976cc440be
 
+# 실거래 소스: sample(번들 샘플) | molit(국토부 실거래가 API, 기본)
+# 환경변수로 덮어쓸 수 있음: REALESTATE_SOURCE, REALESTATE_SERVICE_KEY
+realestate:
+  source: ${REALESTATE_SOURCE:molit}
+  serviceKey: ${REALESTATE_SERVICE_KEY:dZIDlXJ6lVBPn3ucxsfYWnTf9DZVYdes1eHARFvJXc7vM65rU0a%2FcNbwg7TDXSNkGawiroWQlS0ogHqDS%2BgNDA%3D%3D}   # 공공데이터포털 인코딩 키
+  baseUrl: http://apis.data.go.kr/1613000
+
+# 카카오 로컬 API (매물 인근 지하철/학교). 앱에서 '카카오맵' 활성화해야 동작(안 하면 빈 목록).
+kakao:
+  adminKey: ${KAKAO_ADMIN_KEY:93704fda65973add8e3e275eae3b4fa7}   # 카카오 REST 키 (Authorization: KakaoAK {key})
+
 logging:
   level:
     org.springframework.ai.mcp: INFO
