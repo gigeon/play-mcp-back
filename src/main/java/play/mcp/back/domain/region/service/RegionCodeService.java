@@ -27,7 +27,7 @@ public class RegionCodeService {
 
     private final ApiService apiService;
 
-    @Value("${api.region.base-url}")
+    @Value("${api.region.baseUrl}")
     private String baseUrl;
 
     @Value("${api.region.key}")

@@ -55,21 +55,18 @@ public class YouthPoilyTool implements McpTool {
                 해외진출 / 주거지원
                 """, required = false)
             String keyword,
-            @ToolParam(description = """
-                법정시군구코드 5자리. 여러 개면 콤마로 구분.
-                시/도 예: 서울=11000, 부산=26000, 대구=27000, 인천=28000,
-                광주=29000, 대전=30000, 울산=31000, 경기=41000.
-                모르면 생략한다.
-                """, required = false)
-            String zipCd
+            @ToolParam(required = false, description = "거주지 - 동/구/시 이름 또는 전체 주소 (예: 역삼동, 서울 은평구 응암동 125-11)") String region
     ) {
+        List<String> zipCodes = regionCodeService.resolveRegionCodesByAddress(region);
+
         BaseMap param = plcyParam();
         param.put("pageNum", "1");
         param.put("pageSize", "10");
         putIfPresent(param, "lclsfNm", lclsfNm);
         putIfPresent(param, "mclsfNm", mclsfNm);
         putIfPresent(param, "plcyKywdNm", keyword);
-        putIfPresent(param, "zipCd", zipCd);
+        putIfPresent(param, "zipCd", String.join(",", zipCodes));
+
         return callGetPlcy(param);
     }
 
