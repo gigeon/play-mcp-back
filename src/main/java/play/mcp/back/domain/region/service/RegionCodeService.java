@@ -50,7 +50,8 @@ public class RegionCodeService {
         param.put("locatadd_nm", locataddNm.trim());
 
         try {
-            BaseMap resp = apiService.callGet(baseUrl, param);
+            // 법정동 API 는 JSON 본문을 text/html 로 내려주므로 Content-Type 무관 파싱을 쓴다.
+            BaseMap resp = apiService.callGetAsMap(baseUrl, param);
             if (resp == null) return codes;
 
             Object stan = resp.get("StanReginCd");
@@ -79,8 +80,9 @@ public class RegionCodeService {
     /**
      * 자유형식 주소에서 번지·도로명 등 상세주소를 떼어내고 행정구역(시/도·시/군/구·읍/면/동/리)만 남긴다.
      * 앞에서부터 행정구역 토큰을 모으다가, 숫자·도로명 등 행정구역이 아닌 토큰을 만나면 거기서 멈춘다.
+     * 시도 축약형/옛 명칭은 법정동 API 가 인식하는 정식 명칭으로 확장한다(서울→서울특별시).
      *   예) "응암동 125-11"                     → "응암동"
-     *       "서울 은평구 응암동 125-11"          → "서울 은평구 응암동"
+     *       "서울 은평구 응암동 125-11"          → "서울특별시 은평구 응암동"
      *       "역삼동 테헤란로 123"                → "역삼동"
      *       "경기도 성남시 분당구 정자동 45-6"   → "경기도 성남시 분당구 정자동"
      *
@@ -95,7 +97,7 @@ public class RegionCodeService {
         List<String> parts = new ArrayList<>();
         for (String token : address.trim().split("\\s+")) {
             if (isAdminToken(token)) {
-                parts.add(token);       // 시/도·시/군/구·읍/면/동/리 토큰은 유지
+                parts.add(SIDO_FULL.getOrDefault(token, token));   // 시도 축약형/옛 명칭은 정식 명칭으로 확장
             } else if (!parts.isEmpty()) {
                 break;                  // 행정구역 뒤 첫 상세주소(번지/도로명 등)에서 종료
             }
@@ -137,5 +139,23 @@ public class RegionCodeService {
     private static final List<String> SIDO_ABBR = List.of(
             "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
             "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"
+    );
+
+    /**
+     * 시도 축약형/옛 명칭 → 법정동 API 정식 명칭.
+     * (법정동 API 는 부분 명칭이라도 정식 표기여야 검색되며, 강원·전북은 개정 명칭만 인식한다)
+     */
+    private static final Map<String, String> SIDO_FULL = Map.ofEntries(
+            Map.entry("서울", "서울특별시"), Map.entry("부산", "부산광역시"),
+            Map.entry("대구", "대구광역시"), Map.entry("인천", "인천광역시"),
+            Map.entry("광주", "광주광역시"), Map.entry("대전", "대전광역시"),
+            Map.entry("울산", "울산광역시"), Map.entry("세종", "세종특별자치시"),
+            Map.entry("경기", "경기도"), Map.entry("강원", "강원특별자치도"),
+            Map.entry("충북", "충청북도"), Map.entry("충남", "충청남도"),
+            Map.entry("전북", "전북특별자치도"), Map.entry("전남", "전라남도"),
+            Map.entry("경북", "경상북도"), Map.entry("경남", "경상남도"),
+            Map.entry("제주", "제주특별자치도"),
+            // 개정 전 정식 명칭 별칭 (사용자가 옛 이름을 입력하는 경우)
+            Map.entry("강원도", "강원특별자치도"), Map.entry("전라북도", "전북특별자치도")
     );
 }
