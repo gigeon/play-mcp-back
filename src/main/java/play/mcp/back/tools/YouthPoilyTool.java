@@ -10,6 +10,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import play.mcp.back.common.BaseMap;
 import play.mcp.back.domain.api.service.ApiService;
+import play.mcp.back.domain.region.service.RegionCodeService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,7 @@ import java.util.Map;
 public class YouthPoilyTool {
 
     private final ApiService apiService;
+    private final RegionCodeService regionCodeService;
 
     @Value("${api.baseUrl}")
     private String baseUrl;
@@ -102,14 +104,17 @@ public class YouthPoilyTool {
         전국(중앙부처) 정책과 거주지 지자체 정책을 합쳐 나이로 필터링한다.
         지자체 정책은 거주기간 등 추가 요건이 있을 수 있어 결과는 '후보'로 안내한다.
 
+        거주지는 행정안전부 법정동코드 API 로 코드 변환 후, 정책의 대상 지역코드(zipCd)에
+        '포함'되는지로 판정한다. (예: 역삼동 → 강남구 정책 매칭)
+
         Args:
           age: 만 나이
-          region: (선택) 주민등록상 거주지 (예: 서울, 경기, 부산)
+          region: (선택) 주민등록상 거주지 - 동/구/시 단위 (예: 역삼동, 강남구, 서울특별시 강남구)
           lclsfNm: (선택) 정책대분류로 범위 축소
         """)
     public BaseMap matchYouthPolicy(
             @ToolParam(description = "만 나이") int age,
-            @ToolParam(required = false, description = "거주지 (예: 서울, 경기)") String region,
+            @ToolParam(required = false, description = "거주지 - 동/구/시 단위 (예: 역삼동, 강남구, 서울 강남구)") String region,
             @ToolParam(required = false, description = "정책대분류: 일자리/주거/교육/복지문화/참여권리")
             String lclsfNm
     ) {
@@ -119,9 +124,12 @@ public class YouthPoilyTool {
         }
         BaseMap resp = callGetPlcy(p);
 
+        // 거주지 → 법정동코드(10자리) 변환 (한 번만 조회해서 재사용)
+        List<String> userCodes = regionCodeService.resolveRegionCodes(region);
+
         List<Map<String, Object>> matched = new ArrayList<>();
         for (Map<String, Object> it : extractList(resp)) {
-            if (ageMatches(it, age) && regionMatches(it, region)) {
+            if (ageMatches(it, age) && regionMatches(it, region, userCodes)) {
                 matched.add(it);
             }
         }
@@ -129,6 +137,9 @@ public class YouthPoilyTool {
         BaseMap out = new BaseMap();
         out.put("condition", "만 " + age + "세"
                 + (region != null && !region.isBlank() ? " / " + region + " 거주" : ""));
+        if (region != null && !region.isBlank()) {
+            out.put("resolvedRegionCodes", userCodes);   // 법정동코드 변환 결과(투명성/디버깅용)
+        }
         out.put("matchedCount", matched.size());
         out.put("policies", matched);
         out.put("notice", "지자체 정책은 거주기간 등 추가 요건이 있을 수 있습니다. 실제 신청 전 상세 요건을 확인하세요.");
@@ -188,12 +199,30 @@ public class YouthPoilyTool {
     /**
      * 거주지 조건 매칭.
      * - 제공기관 그룹이 중앙부처(0054001)면 전국 대상 → 무조건 포함
-     * - 지자체(0054002)면 등록/운영/주관 기관명에 거주지명이 포함되는지로 후보 판정
-     *   (zipCd 는 법정동 코드라 지역명 텍스트 매칭에는 쓰지 않음)
+     * - 지자체 정책은 사용자 거주지의 법정동코드(10자리)가 정책 대상 지역코드(zipCd,
+     *   콤마구분 시군구 코드)로 '시작'하면 포함으로 본다.
+     *     예) 역삼동(1168010100) startsWith 강남구(11680) → 포함
+     *         시도 단위 코드(11)로 시작해도 자연히 포함됨
+     * - 법정동 조회 실패(userCodes 비어있음) 시 기존 기관명 텍스트 매칭으로 폴백한다.
      */
-    private boolean regionMatches(Map<String, Object> it, String region) {
+    private boolean regionMatches(Map<String, Object> it, String region, List<String> userCodes) {
         if (region == null || region.isBlank()) return true;
         if ("0054001".equals(str(it.get("pvsnInstGroupCd")))) return true;  // 중앙부처=전국
+
+        if (userCodes != null && !userCodes.isEmpty()) {
+            String zip = str(it.get("zipCd"));
+            if (zip == null || zip.isBlank()) return false;   // 지역코드 없는 지자체 정책은 확정 불가 → 제외
+            for (String token : zip.split(",")) {
+                String t = token.trim();
+                if (t.isEmpty()) continue;
+                for (String uc : userCodes) {
+                    if (uc != null && uc.startsWith(t)) return true;
+                }
+            }
+            return false;
+        }
+
+        // 폴백: 법정동코드 변환 실패 → 기관명 텍스트 매칭
         for (String key : new String[]{"rgtrInstCdNm", "operInstCdNm", "sprvsnInstCdNm"}) {
             String v = str(it.get(key));
             if (v != null && v.contains(region)) return true;

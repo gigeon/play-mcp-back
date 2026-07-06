@@ -33,6 +33,10 @@ api:
   key: e92bf925-3d3c-4ef0-8bf9-6e976cc440be
   # 인증키는 코드에서 사용하지 않는다(각 요청의 헤더 apiKeyNm 을 그대로 전달).
   youth-key: a10b9e13-ed06-4d20-932b-46b4351fca2a
+  region:
+    # 행정안전부 행정표준코드 법정동코드 API (동 이름 → 법정동코드 변환)
+    base-url: http://apis.data.go.kr/1741000/StanReginCd/getStanReginCdList
+    key: acd7182a66dd512eb17188871765c661536fe7f5ef8af8b445b5382c40c940fb
 
 logging:
   level:
