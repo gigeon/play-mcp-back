@@ -57,7 +57,11 @@ public class YouthPoilyTool implements McpTool {
             String keyword,
             @ToolParam(required = false, description = "거주지 - 동/구/시 이름 또는 전체 주소 (예: 역삼동, 서울 은평구 응암동 125-11)") String region
     ) {
-        List<String> zipCodes = regionCodeService.resolveRegionCodesByAddress(region);
+        List<String> zipCodes = regionCodeService.resolveRegionCodesByAddress(region).stream()
+            .filter(c -> c != null && c.length() >= 5)
+            .map(c -> c.substring(0, 5))   // 앞 5자리
+            .distinct()                     // 중복 제거 (동들 → 구 하나로)
+            .toList();
 
         BaseMap param = plcyParam();
         param.put("pageNum", "1");
