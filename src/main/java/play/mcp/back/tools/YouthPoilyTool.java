@@ -106,15 +106,17 @@ public class YouthPoilyTool {
 
         거주지는 행정안전부 법정동코드 API 로 코드 변환 후, 정책의 대상 지역코드(zipCd)에
         '포함'되는지로 판정한다. (예: 역삼동 → 강남구 정책 매칭)
+        번지·도로명이 붙은 전체 주소를 넣어도 행정구역만 추려서 처리한다.
 
         Args:
           age: 만 나이
-          region: (선택) 주민등록상 거주지 - 동/구/시 단위 (예: 역삼동, 강남구, 서울특별시 강남구)
+          region: (선택) 주민등록상 거주지 - 동/구/시 이름 또는 전체 주소
+                  (예: 역삼동, 강남구, 서울특별시 강남구, "서울 은평구 응암동 125-11")
           lclsfNm: (선택) 정책대분류로 범위 축소
         """)
     public BaseMap matchYouthPolicy(
             @ToolParam(description = "만 나이") int age,
-            @ToolParam(required = false, description = "거주지 - 동/구/시 단위 (예: 역삼동, 강남구, 서울 강남구)") String region,
+            @ToolParam(required = false, description = "거주지 - 동/구/시 이름 또는 전체 주소 (예: 역삼동, 서울 은평구 응암동 125-11)") String region,
             @ToolParam(required = false, description = "정책대분류: 일자리/주거/교육/복지문화/참여권리")
             String lclsfNm
     ) {
@@ -125,7 +127,8 @@ public class YouthPoilyTool {
         BaseMap resp = callGetPlcy(p);
 
         // 거주지 → 법정동코드(10자리) 변환 (한 번만 조회해서 재사용)
-        List<String> userCodes = regionCodeService.resolveRegionCodes(region);
+        // 번지·도로명이 붙은 전체 주소를 넣어도 행정구역만 추려서 조회한다.
+        List<String> userCodes = regionCodeService.resolveRegionCodesByAddress(region);
 
         List<Map<String, Object>> matched = new ArrayList<>();
         for (Map<String, Object> it : extractList(resp)) {
