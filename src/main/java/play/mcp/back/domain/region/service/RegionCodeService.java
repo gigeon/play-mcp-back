@@ -73,4 +73,64 @@ public class RegionCodeService {
         }
         return codes;
     }
+
+    /* ───────────────────── 주소 → 시/구 정규화 (준비용) ───────────────────── */
+
+    /**
+     * 자유형식 주소에서 '시도 + 시군구'만 뽑아 정규화한다.
+     * 도로명/지번/상세주소는 버리고 행정구역 상위만 남긴다.
+     *   예) "서울특별시 강남구 역삼동 테헤란로 123"  → "서울특별시 강남구"
+     *       "경기도 성남시 분당구 정자동 45-6"       → "경기도 성남시 분당구"
+     *       "부산 해운대구 우동"                     → "부산 해운대구"
+     *
+     * 아직 matchYouthPolicy 흐름에는 연결하지 않은 준비용 메서드다.
+     * (주소 입력을 지원하려면 이 결과를 {@link #resolveRegionCodes(String)} 에 넘기면 된다)
+     *
+     * @return 정규화된 "시도 [시군구...]" 문자열, 추출 실패 시 원본을 trim 하여 반환
+     */
+    public String normalizeToSiGu(String address) {
+        if (address == null || address.isBlank()) return "";
+
+        List<String> parts = new ArrayList<>();
+        for (String token : address.trim().split("\\s+")) {
+            if (isSido(token)) {
+                parts.clear();          // 시도가 나오면 그 앞의 잡토큰은 버리고 새로 시작
+                parts.add(token);
+            } else if (isSiGunGu(token) && !parts.isEmpty()) {
+                parts.add(token);       // 시도 뒤에 오는 시/군/구 (성남시 분당구처럼 2단계도 누적)
+            } else if (!parts.isEmpty()) {
+                break;                  // 시/군/구 뒤 첫 비행정구역 토큰(동/도로명 등)에서 종료
+            }
+        }
+        return parts.isEmpty() ? address.trim() : String.join(" ", parts);
+    }
+
+    /**
+     * 주소를 시/구 단위로 정규화한 뒤 법정동코드를 조회하는 편의 메서드. (준비용)
+     * 상세주소가 붙은 입력에도 대응하려면 {@link #resolveRegionCodes(String)} 대신 이걸 쓰면 된다.
+     */
+    public List<String> resolveRegionCodesByAddress(String address) {
+        return resolveRegionCodes(normalizeToSiGu(address));
+    }
+
+    /** 시도 토큰 여부 (특별시/광역시/특별자치시/특별자치도/도, 축약형 '서울'·'부산' 등 포함). */
+    private boolean isSido(String token) {
+        if (token == null) return false;
+        return token.endsWith("특별시") || token.endsWith("광역시")
+                || token.endsWith("특별자치시") || token.endsWith("특별자치도")
+                || token.endsWith("도")
+                || SIDO_ABBR.contains(token);
+    }
+
+    /** 시/군/구 토큰 여부. (시도 축약형과 겹치지 않도록 축약형은 제외) */
+    private boolean isSiGunGu(String token) {
+        if (token == null || SIDO_ABBR.contains(token)) return false;
+        return token.endsWith("시") || token.endsWith("군") || token.endsWith("구");
+    }
+
+    /** 시도 축약 표기 (사용자가 '서울 강남구'처럼 짧게 입력하는 경우). */
+    private static final List<String> SIDO_ABBR = List.of(
+            "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
+            "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"
+    );
 }
