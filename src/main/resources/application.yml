@@ -32,6 +32,10 @@ api:
   youth:
     baseUrl: https://www.youthcenter.go.kr/go/ythip
     key: e92bf925-3d3c-4ef0-8bf9-6e976cc440be
+  region:
+    # 행정안전부 행정표준코드 법정동코드 API (동 이름 → 법정동코드 변환)
+    baseUrl: http://apis.data.go.kr/1741000/StanReginCd/getStanReginCdList
+    key: acd7182a66dd512eb17188871765c661536fe7f5ef8af8b445b5382c40c940fb
 
 # 실거래 소스: sample(번들 샘플) | molit(국토부 실거래가 API, 기본)
 # 환경변수로 덮어쓸 수 있음: REALESTATE_SOURCE, REALESTATE_SERVICE_KEY

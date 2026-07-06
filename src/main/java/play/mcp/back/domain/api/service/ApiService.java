@@ -1,7 +1,7 @@
 package play.mcp.back.domain.api.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -19,6 +19,7 @@ import java.util.Map;
 @Service
 public class ApiService {
     private final RestClient restClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ApiService(RestClient.Builder builder) {
         this.restClient = builder.build();
@@ -81,5 +82,23 @@ public class ApiService {
                 .body(formData)
                 .retrieve()
                 .body(new ParameterizedTypeReference<BaseMap>() {});
+    }
+
+    public BaseMap callGetAsMap(String url, BaseMap param) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
+        param.forEach((k, v) -> builder.queryParam(k, v));
+        URI uri = builder.build().encode().toUri();
+
+        String body = restClient.get()
+                .uri(uri)
+                .retrieve()
+                .body(String.class);
+
+        if (body == null || body.isBlank()) return new BaseMap();
+        try {
+            return objectMapper.readValue(body, BaseMap.class);
+        } catch (Exception e) {
+            throw new RuntimeException("응답 JSON 파싱 실패: " + e.getMessage(), e);
+        }
     }
 }
