@@ -1,21 +1,17 @@
 package play.mcp.back.domain.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 import play.mcp.back.common.BaseMap;
 
 import java.net.URI;
-import java.util.Map;
 
+/**
+ * 외부 REST API 호출 유틸. 쿼리파라미터를 인코딩해 GET 하고 응답을 {@link BaseMap} 으로 받는다.
+ */
 @Service
 public class ApiService {
 
@@ -39,6 +35,7 @@ public class ApiService {
         return builder.build().encode().toUri();
     }
 
+    /** GET 호출 후 응답을 BaseMap(JSON 파싱)으로 반환한다. */
     public BaseMap callGet(String url, BaseMap param) {
         return restClient.get()
                 .uri(buildUri(url, param))
@@ -46,48 +43,10 @@ public class ApiService {
                 .body(BASE_MAP);
     }
 
-    public BaseMap callPost(String url, BaseMap param) {
-        return restClient.post()
-                .uri(url)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(param)
-                .retrieve()
-                .body(BASE_MAP);
-    }
-
-    public String getToken(String key) {
-         HttpServletRequest request = ((ServletRequestAttributes)
-                RequestContextHolder.currentRequestAttributes()).getRequest();
-         return request.getHeader(key);
-    }
-
-    public BaseMap callGet(String url, BaseMap param, String token) {
-        return restClient.get()
-                .uri(buildUri(url, param))
-                .header("Authorization", token) // PlayMCP에서 받은 토큰 주입
-                .retrieve()
-                .body(BASE_MAP);
-    }
-
     /**
-     * Header에 토큰을 포함하는 POST 요청 (카카오 톡캘린더 등록용)
-     * 카카오는 기본적으로 Form Url Encoded 방식을 사용합니다.
+     * GET 호출 후 <b>본문 문자열</b>을 직접 JSON 파싱한다.
+     * 법정동 API 처럼 JSON 을 {@code text/html} 로 내려주는 경우에 쓴다.
      */
-    public BaseMap callPost(String url, BaseMap param, String token) {
-        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        if (param != null) {
-            param.forEach((k, v) -> formData.add(k, String.valueOf(v)));
-        }
-
-        return restClient.post()
-                .uri(url)
-                .header("Authorization", token) // PlayMCP에서 받은 토큰 주입
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED) // 카카오 표준 포맷
-                .body(formData)
-                .retrieve()
-                .body(BASE_MAP);
-    }
-
     public BaseMap callGetAsMap(String url, BaseMap param) {
         String body = restClient.get()
                 .uri(buildUri(url, param))
