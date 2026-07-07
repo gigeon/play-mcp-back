@@ -115,7 +115,16 @@ public final class LawdCode {
             return SIDO_DEFAULT.get(sido);
         }
 
-        // 3) 시도 없이 시군구만 준 경우(예: "강남구") — 전 시도에서 검색
+        // 3) 하드코딩되지 않은 시도(대구/광주/경기 등)가 명시된 경우:
+        //    부분매칭으로 다른 시도의 구에 오인식("대구 달서구"→부산 "서구")되지 않도록
+        //    바로 null 을 반환해 상위의 법정동코드 API 폴백으로 넘긴다.
+        for (String s : OTHER_SIDO) {
+            if (r.contains(s)) {
+                return null;
+            }
+        }
+
+        // 4) 시도 없이 시군구만 준 경우(예: "강남구") — 전 시도에서 검색
         for (Map<String, String> gu : SIDO.values()) {
             for (Map.Entry<String, String> e : gu.entrySet()) {
                 if (r.contains(e.getKey())) {
@@ -123,9 +132,15 @@ public final class LawdCode {
                 }
             }
         }
-        // 4) 구도 없이 동만 준 경우(예: "청라") — 동 힌트로 라우팅
+        // 5) 구도 없이 동만 준 경우(예: "청라") — 동 힌트로 라우팅
         return dongHint(r);
     }
+
+    /** 하드코딩 맵(SIDO)에 없는 시도 키워드. 이게 있으면 시군구 부분매칭을 건너뛴다. */
+    private static final java.util.List<String> OTHER_SIDO = java.util.List.of(
+            "대구", "광주", "대전", "울산", "세종",
+            "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"
+    );
 
     /** 지역 문자열에 알려진 동 힌트가 있으면 해당 시군구코드를 반환. */
     private static String dongHint(String region) {

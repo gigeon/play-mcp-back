@@ -113,6 +113,47 @@ public class RegionCodeService {
         return resolveRegionCodes(normalizeAddress(address));
     }
 
+    /** 토큰이 시도(축약형 또는 정식명)인지. (오타 보정에서 시도 판별용) */
+    public boolean isSidoToken(String token) {
+        return token != null && (SIDO_FULL.containsKey(token) || SIDO_FULL.containsValue(token));
+    }
+
+    /**
+     * 특정 시도의 시군구 이름 목록을 법정동코드 API 에서 가져온다(오타 보정 후보용).
+     * 응답 locatadd_nm("대구광역시 달서구 …")의 2번째 토큰(시군구)을 중복 없이 수집한다.
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> sigunguNamesOf(String sidoToken) {
+        String full = SIDO_FULL.getOrDefault(sidoToken, sidoToken);
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+
+        BaseMap param = new BaseMap();
+        param.put("ServiceKey", serviceKey);
+        param.put("pageNo", 1);
+        param.put("numOfRows", 1000);
+        param.put("type", "json");
+        param.put("locatadd_nm", full);
+        try {
+            BaseMap resp = apiService.callGetAsMap(baseUrl, param);
+            if (!(resp.get("StanReginCd") instanceof List<?> sections)) return List.of();
+            for (Object section : sections) {
+                if (!(section instanceof Map<?, ?> m)) continue;
+                Object rows = ((Map<String, Object>) m).get("row");
+                if (!(rows instanceof List<?> rowList)) continue;
+                for (Object row : rowList) {
+                    if (!(row instanceof Map<?, ?> r)) continue;
+                    Object addr = ((Map<String, Object>) r).get("locatadd_nm");
+                    if (addr == null) continue;
+                    String[] tok = String.valueOf(addr).trim().split("\\s+");
+                    if (tok.length >= 2 && !tok[1].isBlank()) names.add(tok[1]);
+                }
+            }
+        } catch (Exception ignored) {
+            // 실패 시 빈 목록 → 보정 생략
+        }
+        return new ArrayList<>(names);
+    }
+
     /**
      * 행정구역 토큰 여부.
      * 시/도 축약형(서울·부산…) 또는 행정구역 접미사(도/시/군/구/읍/면/동/리/가)로 끝나면 참.

@@ -8,11 +8,11 @@ import org.springframework.stereotype.Service;
 import play.mcp.back.common.BaseMap;
 import play.mcp.back.common.McpTool;
 import play.mcp.back.domain.api.service.ApiService;
+import play.mcp.back.domain.region.service.RegionCodeService;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import play.mcp.back.domain.region.service.RegionCodeService;
 
 @Service
 @RequiredArgsConstructor
@@ -28,50 +28,121 @@ public class YouthPoilyTool implements McpTool {
     private String apiKey;
 
     @Tool(description = """
-        청년 정책을 대분류, 중분류, 키워드, 지역 조건으로 검색한다.
-        사용자가 특정 분야나 조건의 청년 지원 정책 목록을 찾을 때 사용한다.
-        여러 조건을 동시에 걸 수 있으며, 조건이 없으면 전체에서 검색한다.
-        상세 정보가 필요하면 결과의 plcyNo로 getPolicyDetail을 사용한다.
+        청년 정책을 대분류/중분류/키워드/지역 조건으로 검색한다.
+        사용자가 특정 분야·조건의 청년 지원 정책 목록을 찾을 때 사용한다. 조건이 없으면 전체 검색.
+
+        [입력 규칙 — 중요]
+        - lclsfNm/mclsfNm/keyword 는 아래 '가능한 값' 목록에 있는 단어만 유효하다. 목록에 없는 임의어를 넣으면 결과가 0건이 될 수 있으니, 사용자의 자연어를 목록의 정확한 단어로 매핑해서 넣어라.
+          (예: 사용자가 "전세대출" → keyword=대출, "집" → lclsfNm=주거, "알바" → lclsfNm=일자리)
+        - 여러 값은 콤마(,)로 구분한다. 콤마 앞뒤 공백은 자동 제거되지만, 되도록 공백 없이 넣어라. (예: "주거,일자리")
+        - 하나의 값 안에 콤마를 넣지 마라. "주택 및 거주지"처럼 공백이 포함된 값은 통째로 하나의 토큰이다("주택,및,거주지" 아님).
+        - 상세가 필요하면 결과 plcyNo 로 getPolicyDetail 을 호출한다.
         """)
     public BaseMap searchPolicy(
             @ToolParam(description = """
-                정책 대분류명. 여러 개면 콤마로 구분.
-                가능한 값: 일자리 / 주거 / 교육 / 복지문화 / 참여권리
+                정책 대분류. 목록의 단어만 사용. 여러 개면 콤마 구분(공백없이).
+                가능한 값: 일자리 | 주거 | 교육 | 복지문화 | 참여권리
+                예: "주거"  또는  "주거,일자리"
                 """, required = false)
             String lclsfNm,
             @ToolParam(description = """
-                정책 중분류명. 여러 개면 콤마로 구분.
-                가능한 값: 취업 / 재직자 / 창업 / 주택 및 거주지 / 기숙사 /
-                전월세 및 주거급여 지원 / 미래역량강화 / 교육비지원 / 온라인교육 /
-                취약계층 및 금융지원 / 건강 / 예술인지원 / 문화활동 / 청년참여 /
-                정책인프라구축 / 청년국제교류 / 권익보호
+                정책 중분류. 목록의 단어만 사용(공백 포함 값은 통째로 하나). 여러 개면 콤마 구분.
+                가능한 값: 취업 | 재직자 | 창업 | 주택 및 거주지 | 기숙사 |
+                전월세 및 주거급여 지원 | 미래역량강화 | 교육비지원 | 온라인교육 |
+                취약계층 및 금융지원 | 건강 | 예술인지원 | 문화활동 | 청년참여 |
+                정책인프라구축 | 청년국제교류 | 권익보호
+                예: "주택 및 거주지"  (O)   /   "주택,및,거주지" (X)
                 """, required = false)
             String mclsfNm,
             @ToolParam(description = """
-                정책 키워드명. 여러 개면 콤마로 구분.
-                가능한 값: 대출 / 보조금 / 바우처 / 금리혜택 / 교육지원 /
-                맞춤형상담서비스 / 인턴 / 벤처 / 중소기업 / 청년가장 /
-                장기미취업청년 / 공공임대주택 / 신용회복 / 육아 / 출산 /
-                해외진출 / 주거지원
+                정책 키워드 태그. 목록의 단어만 사용. 여러 개면 콤마 구분(공백없이).
+                가능한 값: 대출 | 보조금 | 바우처 | 금리혜택 | 교육지원 |
+                맞춤형상담서비스 | 인턴 | 벤처 | 중소기업 | 청년가장 |
+                장기미취업청년 | 공공임대주택 | 신용회복 | 육아 | 출산 | 해외진출 | 주거지원
+                예: "대출"  또는  "대출,보조금"
                 """, required = false)
             String keyword,
-            @ToolParam(required = false, description = "거주지 - 동/구/시 이름 또는 전체 주소 (예: 역삼동, 서울 은평구 응암동 125-11)") String region
+            @ToolParam(description = """
+                지역. 지역명 또는 법정시군구코드 5자리. 지역명은 법정동코드로 자동 변환된다.
+                지역명은 '시/도 + 시/군/구'를 함께 주면 정확하다. (동/번지는 시군구로 처리됨)
+                예: "서울 강남구" | "대구 수성구" | "11680"  · 여러 개면 콤마 구분 · 모르면 생략
+                """, required = false)
+            String zipCd
     ) {
-        List<String> zipCodes = regionCodeService.resolveRegionCodesByAddress(region).stream()
-            .filter(c -> c != null && c.length() >= 5)
-            .map(c -> c.substring(0, 5))   // 앞 5자리
-            .distinct()                     // 중복 제거 (동들 → 구 하나로)
-            .toList();
-
+        boolean filterMclsf = mclsfNm != null && !mclsfNm.isBlank();
         BaseMap param = plcyParam();
         param.put("pageNum", "1");
-        param.put("pageSize", "10");
-        putIfPresent(param, "lclsfNm", lclsfNm);
-        putIfPresent(param, "mclsfNm", mclsfNm);
-        putIfPresent(param, "plcyKywdNm", keyword);
-        putIfPresent(param, "zipCd", String.join(",", zipCodes));
+        // 중분류는 API 가 공백 포함 값을 필터 못 해 클라이언트에서 거르므로 넉넉히 받는다.
+        param.put("pageSize", filterMclsf ? "100" : "10");
+        putIfPresent(param, "lclsfNm", csv(lclsfNm));        // "일자리, 주거" → "일자리,주거" (콤마 뒤 공백 제거)
+        putIfPresent(param, "plcyKywdNm", csv(keyword));
+        putIfPresent(param, "zipCd", resolveZipCd(zipCd));   // 지역명이면 법정동 시군구코드로 자동 변환
 
-        return callGetPlcy(param);
+        BaseMap resp = callGetPlcy(param);
+        return filterMclsf ? filterByMclsfNm(resp, csv(mclsfNm)) : resp;
+    }
+
+    /** 콤마 구분 값의 각 토큰 공백을 제거하고 빈 토큰을 버린다. "일자리, 주거" → "일자리,주거". */
+    private static String csv(String v) {
+        if (v == null || v.isBlank()) return null;
+        List<String> parts = new ArrayList<>();
+        for (String t : v.split(",")) {
+            if (!t.trim().isEmpty()) parts.add(t.trim());
+        }
+        return parts.isEmpty() ? null : String.join(",", parts);
+    }
+
+    /**
+     * zipCd 입력이 지역명이면 법정동 API 로 시군구 5자리 코드로 변환한다. 5자리 숫자는 그대로 둔다.
+     * <p>지역명은 <b>시군구 단위(region_cd 끝 5자리 00000)</b>만 취해, "안산"이 타 지역 "안산동"까지
+     * 부분매칭으로 잡는 것을 배제한다. 그 결과 "안산"과 "안산시"가 동일한 결과를 낸다.
+     * (시군구 단위 매칭이 없으면 — 예: 동 이름 입력 — 전체 매칭의 앞 5자리로 폴백한다.)</p>
+     */
+    private String resolveZipCd(String zipCd) {
+        if (zipCd == null || zipCd.isBlank()) return null;
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String tok : zipCd.split(",")) {
+            String t = tok.trim();
+            if (t.isEmpty()) continue;
+            if (t.matches("\\d{5}")) {
+                out.add(t);
+                continue;
+            }
+            List<String> codes = regionCodeService.resolveRegionCodesByAddress(t);
+            List<String> sigungu = codes.stream()
+                    .filter(c -> c != null && c.length() == 10 && c.endsWith("00000"))
+                    .toList();
+            List<String> use = sigungu.isEmpty() ? codes : sigungu;   // 동 입력 등은 전체로 폴백
+            for (String code : use) {
+                if (code != null && code.length() >= 5) out.add(code.substring(0, 5));
+            }
+        }
+        return out.isEmpty() ? null : String.join(",", out);
+    }
+
+    /** 응답의 youthPolicyList 를 mclsfNm(콤마구분, 부분일치)으로 거르고 pagging.totCount 를 갱신한다. */
+    @SuppressWarnings("unchecked")
+    private BaseMap filterByMclsfNm(BaseMap resp, String mclsfNm) {
+        String[] wants = mclsfNm.split(",");
+        List<Map<String, Object>> filtered = new ArrayList<>();
+        for (Map<String, Object> p : extractList(resp)) {
+            String v = str(p.get("mclsfNm"));
+            if (v == null) continue;
+            for (String w : wants) {
+                if (!w.trim().isEmpty() && v.contains(w.trim())) {
+                    filtered.add(p);
+                    break;
+                }
+            }
+        }
+        if (resp.get("result") instanceof Map<?, ?> result) {
+            Map<String, Object> r = (Map<String, Object>) result;
+            r.put("youthPolicyList", filtered);
+            if (r.get("pagging") instanceof Map<?, ?> pg) {
+                ((Map<String, Object>) pg).put("totCount", filtered.size());
+            }
+        }
+        return resp;
     }
 
     @Tool(description = """
@@ -83,18 +154,23 @@ public class YouthPoilyTool implements McpTool {
         """)
     public BaseMap findMyPolicy(
             @ToolParam(description = """
-                관심 분야 대분류명 (선택).
-                일자리 / 주거 / 교육 / 복지문화 / 참여권리
+                관심 분야 대분류(선택). 아래 목록의 단어만 유효 — 사용자 자연어를 목록 단어로 매핑해 넣어라.
+                가능한 값: 일자리 | 주거 | 교육 | 복지문화 | 참여권리
+                여러 개면 콤마 구분(공백없이). 예: "주거" 또는 "주거,교육"
                 """, required = false)
             String lclsfNm,
-            @ToolParam(description = "관심 키워드 (선택)", required = false)
+            @ToolParam(description = """
+                관심 키워드(선택). 정책명(plcyNm) 부분검색이라 목록에 없는 자유어도 가능하다.
+                예: 장학금 | 전세 | 월세 | 면접  (한 단어 위주로 넣는 게 정확)
+                """, required = false)
             String keyword
     ) {
         BaseMap param = plcyParam();
         param.put("pageNum", "1");
         param.put("pageSize", "50");
         putIfPresent(param, "lclsfNm", lclsfNm);
-        putIfPresent(param, "plcyKywdNm", keyword);
+        // plcyKywdNm(태그 정확일치)은 '장학금'처럼 태그가 없으면 0건이 되므로 plcyNm(정책명 부분검색)을 쓴다.
+        putIfPresent(param, "plcyNm", keyword);
         return callGetPlcy(param);
     }
 
@@ -108,18 +184,37 @@ public class YouthPoilyTool implements McpTool {
     public BaseMap getPolicyDetail(
             @ToolParam(description = "정책 번호") String plcyNo
     ) {
-        return policyDetail(plcyNo);
+        return policyDetailOrError(plcyNo);
     }
 
     @Tool(description = """
-        여러 정책을 비교할 때 사용한다. 정책번호마다 상세를 조회해 반환하므로,
-        AI가 응답들을 나란히 놓고 지원내용, 연령, 소득조건 등 차이를 정리한다.
-        한 번에 여러 번 호출해도 되며, 정책번호 하나를 받아 상세를 반환한다.
+        여러 정책을 한 번에 비교할 때 사용한다. 콤마로 구분한 정책번호들을 받아
+        각각의 상세를 조회해 목록으로 반환하므로, AI가 지원내용·연령·소득조건 등 차이를 정리한다.
+        정책번호 하나만 넣으면 그 정책 상세만 반환한다.
         """)
     public BaseMap comparePolicy(
-            @ToolParam(description = "비교할 정책 번호 하나") String plcyNo
+            @ToolParam(description = "비교할 정책 번호들. 여러 개면 콤마로 구분 (예: 2026...,2026...)") String plcyNos
     ) {
-        return policyDetail(plcyNo);
+        List<Map<String, Object>> policies = new ArrayList<>();
+        List<String> invalid = new ArrayList<>();
+        if (plcyNos != null) {
+            for (String no : plcyNos.split(",")) {
+                String plcyNo = no.trim();
+                if (plcyNo.isEmpty()) continue;
+                if (!isValidPlcyNo(plcyNo)) { invalid.add(plcyNo); continue; }   // 형식 오류(특수문자 등)
+                List<Map<String, Object>> one = extractList(policyDetail(plcyNo));
+                if (one.isEmpty()) invalid.add(plcyNo);   // 조회 결과 없음 = 잘못된 정책번호
+                else policies.addAll(one);
+            }
+        }
+        BaseMap out = new BaseMap();
+        out.put("comparedCount", policies.size());
+        out.put("policies", policies);
+        if (!invalid.isEmpty()) {
+            out.put("invalidPlcyNos", invalid);
+            out.put("message", "제대로된 정책번호가 아닙니다: " + String.join(", ", invalid));
+        }
+        return out;
     }
 
     @Tool(description = """
@@ -130,7 +225,7 @@ public class YouthPoilyTool implements McpTool {
     public BaseMap getApplyGuide(
             @ToolParam(description = "정책 번호") String plcyNo
     ) {
-        return policyDetail(plcyNo);
+        return policyDetailOrError(plcyNo);
     }
 
     @Tool(description = """
@@ -231,6 +326,29 @@ public class YouthPoilyTool implements McpTool {
         param.put("plcyNo", plcyNo);
         param.put("pageType", "2");
         return callGetPlcy(param);
+    }
+
+    /** 정책번호 형식(숫자 20자리)이 맞는지. 특수문자·공백·자릿수 오류를 API 호출 전에 거른다. */
+    private static boolean isValidPlcyNo(String plcyNo) {
+        return plcyNo != null && plcyNo.trim().matches("\\d{15,20}");
+    }
+
+    /** 형식 검증 → 상세 조회 → 결과 없으면 에러. 잘못된 정책번호는 명확히 안내한다. */
+    private BaseMap policyDetailOrError(String plcyNo) {
+        if (!isValidPlcyNo(plcyNo)) {
+            BaseMap err = new BaseMap();
+            err.put("plcyNo", plcyNo);
+            err.put("error", "정책번호 형식이 올바르지 않습니다. 숫자 20자리를 입력하세요: " + plcyNo);
+            return err;
+        }
+        BaseMap resp = policyDetail(plcyNo.trim());
+        if (extractList(resp).isEmpty()) {
+            BaseMap err = new BaseMap();
+            err.put("plcyNo", plcyNo);
+            err.put("error", "제대로된 정책번호가 아닙니다: " + plcyNo);
+            return err;
+        }
+        return resp;
     }
 
     /* ───────────────────────── 파싱 헬퍼 ───────────────────────── */
