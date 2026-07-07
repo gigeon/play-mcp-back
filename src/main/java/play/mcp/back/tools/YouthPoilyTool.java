@@ -149,11 +149,11 @@ public class YouthPoilyTool implements McpTool {
     }
 
     @Tool(description = """
-        청년 본인의 나이나 결혼여부에 맞는 정책을 찾을 때 사용한다.
-        분야나 키워드로 정책을 조회한 뒤, 응답의 지원연령(sprtTrgtMinAge~sprtTrgtMaxAge)과
-        결혼조건(mrgSttsCd)을 보고 사용자 조건에 맞는 정책만 골라 안내한다.
-        (mrgSttsCd: 0055001=기혼, 0055002=미혼, 0055003=제한없음.
-         sprtTrgtAgeLmtYn=N 이면 연령 제한 없음)
+        분야/키워드로 청년정책 후보 목록을 조회한다. (나이·결혼여부로 서버에서 거르지는 않는다.)
+        반환된 각 정책의 지원연령·결혼조건 필드를 보고, 사용자의 나이·결혼여부에 맞는 것만 AI가 직접 골라 안내하라.
+          - 지원연령: sprtTrgtMinAge ~ sprtTrgtMaxAge (sprtTrgtAgeLmtYn=N 이면 연령 제한 없음 → 모두 대상)
+          - 결혼조건 mrgSttsCd: 0055001=기혼 / 0055002=미혼 / 0055003=제한없음
+        최대 50건까지만 반환하므로, 결과가 많을 것 같으면 lclsfNm/keyword 로 범위를 좁혀서 호출하라.
         """)
     public BaseMap findMyPolicy(
             @ToolParam(description = """

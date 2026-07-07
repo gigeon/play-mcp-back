@@ -48,9 +48,6 @@ public class RecommendHousingTool implements McpTool {
     public record HousingRecommendation(LoanResult loan, List<RecommendedDeal> deals, String notice) {
     }
 
-    /** 혼인 여부. enum 이라 MCP 스키마에 선택지(미혼/기혼)로 노출된다. */
-    public enum MaritalStatus { 미혼, 기혼 }
-
     @Tool(description = """
         청년 주거 추천.
         전월세보증금대출 자격/한도를 판정하고, 그 한도 안에서 거래된 실거래 매물을 추천하며
@@ -63,7 +60,7 @@ public class RecommendHousingTool implements McpTool {
         housingType: 아파트/오피스텔/빌라
         dealType: 전세/월세/매매
         age: 나이(만)
-        maritalStatus: 혼인 여부 (미혼/기혼)
+        married: 혼인 여부 (기혼=true, 미혼=false)
         income: 연소득(만원)
     """)
     public HousingRecommendation recommendHousing(
@@ -71,11 +68,9 @@ public class RecommendHousingTool implements McpTool {
             @ToolParam(description = "주택유형: 아파트/오피스텔/빌라") String housingType,
             @ToolParam(description = "거래유형: 전세/월세/매매") String dealType,
             @ToolParam(description = "나이(만)") int age,
-            @ToolParam(description = "혼인 여부") MaritalStatus maritalStatus,
+            @ToolParam(description = "혼인 여부: 기혼이면 true, 미혼이면 false") boolean married,
             @ToolParam(description = "연소득(만원)") int income
     ) {
-        boolean married = maritalStatus == MaritalStatus.기혼;
-
         // 0-1) 입력값 검증. 잘못된 값이면 조회 없이 안내만 반환.
         String error = validate(region, housingType, dealType, age, income);
         if (error != null) {
