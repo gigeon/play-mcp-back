@@ -2,12 +2,14 @@ package play.mcp.back.domain.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import play.mcp.back.common.BaseMap;
 
 import java.net.URI;
+import java.time.Duration;
 
 /**
  * 외부 REST API 호출 유틸. 쿼리파라미터를 인코딩해 GET 하고 응답을 {@link BaseMap} 으로 받는다.
@@ -23,7 +25,12 @@ public class ApiService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ApiService(RestClient.Builder builder) {
-        this.restClient = builder.build();
+        // 타임아웃 미설정 시 외부 API 지연 때 무한 대기 → 툴이 멈춤(응답 없음).
+        // connect 3s / read 10s 로 끊어, 지연 시 예외로 빠르게 실패시킨다.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(3));
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        this.restClient = builder.requestFactory(factory).build();
     }
 
     /** url + 쿼리파라미터 → 인코딩된 URI. 한글/특수문자를 안전하게 인코딩한다. */

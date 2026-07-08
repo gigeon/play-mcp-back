@@ -118,6 +118,12 @@ public class YouthPoilyTool implements McpTool {
                 continue;
             }
             List<String> codes = regionCodeService.resolveRegionCodesByAddress(t);
+            // 시도만 입력(예: "서울")한 경우: 법정동 API 가 최대 100건만 주어 일부 구만 잡히는 문제가 있으므로,
+            // 시도 대표 5자리 코드(예: 11000)로 처리한다. youthcenter 는 이를 '해당 시도 전체'로 인식한다.
+            if (regionCodeService.isSidoToken(t) && !codes.isEmpty()) {
+                out.add(codes.get(0).substring(0, 2) + "000");
+                continue;
+            }
             List<String> sigungu = codes.stream()
                     .filter(c -> c != null && c.length() == 10 && c.endsWith("00000"))
                     .toList();
