@@ -28,19 +28,11 @@ public class YouthPoilyTool implements McpTool {
     private String apiKey;
 
     @Tool(description = """
-        청년 정책을 대분류/중분류/키워드/지역 조건으로 검색한다.
-        사용자가 특정 분야·조건의 청년 지원 정책 목록을 찾을 때 사용한다.
-
-        [안내] 요청이 막연하면(예: "청년정책 알려줘") 바로 전체를 보여드리기보다 먼저 다정하게 여쭤봐 주세요.
-        이렇게요: "어떤 분야가 궁금하세요? 주거·일자리·교육·복지문화·참여권리 중에서요. 관심 키워드(예: 대출, 장학금)나
-        지역이 있으면 함께 알려주시면 딱 맞게 찾아드릴게요 :)" 조건이 최소 하나 정해지면 검색해 주세요.
-
-        [입력 규칙 — 중요]
-        - lclsfNm/mclsfNm/keyword 는 아래 '가능한 값' 목록에 있는 단어만 유효하다. 목록에 없는 임의어를 넣으면 결과가 0건이 될 수 있으니, 사용자의 자연어를 목록의 정확한 단어로 매핑해서 넣어라.
-          (예: 사용자가 "전세대출" → keyword=대출, "집" → lclsfNm=주거, "알바" → lclsfNm=일자리)
-        - 여러 값은 콤마(,)로 구분한다. 콤마 앞뒤 공백은 자동 제거되지만, 되도록 공백 없이 넣어라. (예: "주거,일자리")
-        - 하나의 값 안에 콤마를 넣지 마라. "주택 및 거주지"처럼 공백이 포함된 값은 통째로 하나의 토큰이다("주택,및,거주지" 아님).
-        - 상세가 필요하면 결과 plcyNo 로 getPolicyDetail 을 호출한다.
+        청년정책을 분야·중분류·키워드·지역으로 검색한다.
+        요청이 막연하면("청년정책 알려줘") 바로 검색하지 말고 관심 분야/키워드/지역을 먼저 물어본 뒤, 조건이 하나라도 정해지면 검색한다.
+        - lclsfNm/mclsfNm/keyword 는 각 파라미터의 '가능한 값' 목록 단어만 유효 — 사용자 자연어를 그 단어로 매핑해 넣어라(없는 임의어는 0건 위험). 예: "알바"→일자리, "집"→주거, "전세대출"→대출.
+        - 여러 값은 콤마 구분, 값 안에는 콤마 금지("주택 및 거주지"는 하나의 토큰).
+        - 상세는 결과 plcyNo 로 getPolicyDetail 호출.
         """)
     public BaseMap searchPolicy(
             @ToolParam(description = """
@@ -83,10 +75,16 @@ public class YouthPoilyTool implements McpTool {
         param.put("pageSize", filterMclsf ? "100" : "10");
         putIfPresent(param, "lclsfNm", csv(lclsfNm));        // "일자리, 주거" → "일자리,주거" (콤마 뒤 공백 제거)
         putIfPresent(param, "plcyKywdNm", csv(keyword));
-        putIfPresent(param, "zipCd", resolveZipCd(zipCd));   // 지역명이면 법정동 시군구코드로 자동 변환
+        ZipResult zip = resolveZipCd(zipCd);                 // 지역명이면 법정동 시군구코드로 자동 변환
+        putIfPresent(param, "zipCd", zip.codes());
 
         BaseMap resp = callGetPlcy(param);
         BaseMap out = slimResponse(filterMclsf ? filterByMclsfNm(resp, csv(mclsfNm)) : resp);
+        if (!zip.ambiguous().isEmpty()) {
+            out.put("regionWarning", "'" + String.join("', '", zip.ambiguous())
+                    + "' 은(는) 여러 시/도에 있어 해당하는 지역을 모두 조회했습니다."
+                    + " 특정 지역만 원하면 '서울 중구'처럼 시/도를 함께 알려주세요.");
+        }
         if (housingRelated(lclsfNm, mclsfNm, keyword)) out.put("followUp", HOUSING_FOLLOW_UP);
         return out;
     }
@@ -107,9 +105,13 @@ public class YouthPoilyTool implements McpTool {
      * 부분매칭으로 잡는 것을 배제한다. 그 결과 "안산"과 "안산시"가 동일한 결과를 낸다.
      * (시군구 단위 매칭이 없으면 — 예: 동 이름 입력 — 전체 매칭의 앞 5자리로 폴백한다.)</p>
      */
-    private String resolveZipCd(String zipCd) {
-        if (zipCd == null || zipCd.isBlank()) return null;
+    /** zipCd 변환 결과: youthcenter 에 넘길 코드(codes) + 여러 시/도에 걸쳐 모호했던 지역명(ambiguous). */
+    private record ZipResult(String codes, List<String> ambiguous) {}
+
+    private ZipResult resolveZipCd(String zipCd) {
+        if (zipCd == null || zipCd.isBlank()) return new ZipResult(null, List.of());
         java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        List<String> ambiguous = new ArrayList<>();
         for (String tok : zipCd.split(",")) {
             String t = tok.trim();
             if (t.isEmpty()) continue;
@@ -128,11 +130,16 @@ public class YouthPoilyTool implements McpTool {
                     .filter(c -> c != null && c.length() == 10 && c.endsWith("00000"))
                     .toList();
             List<String> use = sigungu.isEmpty() ? codes : sigungu;   // 동 입력 등은 전체로 폴백
+            // 같은 시군구명("중구")이 여러 시/도에 있으면(앞 2자리 시도코드가 2종 이상) 모호로 표시.
+            long sidoCount = use.stream()
+                    .filter(c -> c != null && c.length() >= 2)
+                    .map(c -> c.substring(0, 2)).distinct().count();
+            if (sidoCount > 1) ambiguous.add(t);
             for (String code : use) {
                 if (code != null && code.length() >= 5) out.add(code.substring(0, 5));
             }
         }
-        return out.isEmpty() ? null : String.join(",", out);
+        return new ZipResult(out.isEmpty() ? null : String.join(",", out), ambiguous);
     }
 
     /** 응답의 youthPolicyList 를 mclsfNm(콤마구분, 부분일치)으로 거르고 pagging.totCount 를 갱신한다. */
@@ -161,16 +168,11 @@ public class YouthPoilyTool implements McpTool {
     }
 
     @Tool(description = """
-        분야/키워드로 청년정책 후보 목록을 조회한다. (나이·결혼여부로 서버에서 거르지는 않는다.)
-
-        [안내] 어떤 분야·키워드인지 분명하지 않으면 바로 찾기보다 먼저 상냥하게 여쭤봐 주세요.
-        "어떤 분야나 키워드로 찾아드릴까요? 나이랑 결혼 여부도 알려주시면 조건에 맞는 것만 쏙 골라드릴게요 :)"
-        처럼요. (나이·결혼여부는 결과를 걸러 안내하는 데 쓰여요)
-
-        반환된 각 정책의 지원연령·결혼조건 필드를 보고, 사용자의 나이·결혼여부에 맞는 것만 AI가 직접 골라 안내하라.
-          - 지원연령: sprtTrgtMinAge ~ sprtTrgtMaxAge (sprtTrgtAgeLmtYn=N 이면 연령 제한 없음 → 모두 대상)
-          - 결혼조건 mrgSttsCd: 0055001=기혼 / 0055002=미혼 / 0055003=제한없음
-        최대 50건까지만 반환하므로, 결과가 많을 것 같으면 lclsfNm/keyword 로 범위를 좁혀서 호출하라.
+        분야/키워드로 청년정책 후보를 조회한다(나이·결혼으로 서버 필터는 안 함).
+        분야·키워드가 불명확하면 먼저 물어본다(나이·결혼여부도 받으면 결과를 걸러 안내 가능).
+        반환된 각 정책의 지원연령(sprtTrgtMinAge~sprtTrgtMaxAge, sprtTrgtAgeLmtYn=N이면 무관)과
+        결혼조건(mrgSttsCd: 0055001기혼/0055002미혼/0055003무관)을 보고 AI가 맞는 것만 골라 안내하라.
+        최대 50건 반환 — 많으면 lclsfNm/keyword 로 좁혀 호출.
         """)
     public BaseMap findMyPolicy(
             @ToolParam(description = """
