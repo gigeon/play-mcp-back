@@ -149,4 +149,15 @@ public final class LawdCode {
         }
         return null;
     }
+
+    /** 하드코딩 맵(서울/인천/부산)에 있는 실제 시군구명을 포함하는지. 지역 유효성 확인용. */
+    public static boolean hasKnownSigungu(String region) {
+        if (region == null) return false;
+        for (Map<String, String> gu : SIDO.values()) {
+            for (String name : gu.keySet()) {
+                if (region.contains(name)) return true;
+            }
+        }
+        return false;
+    }
 }

@@ -20,6 +20,16 @@ public class RegionCorrector {
     private final RegionCodeService regionCodeService;
 
     /**
+     * 실재하는 지역인지 확인한다. 하드코딩 시군구명이 있거나, 법정동 API 로 코드가 조회되면 유효.
+     * (예: "서울 청라동"은 서울에 청라동이 없어 무효 → 호출부에서 재입력 안내)
+     */
+    public boolean isKnownRegion(String region) {
+        if (region == null || region.isBlank()) return false;
+        if (LawdCode.hasKnownSigungu(region)) return true;
+        return !regionCodeService.resolveRegionCodesByAddress(region).isEmpty();
+    }
+
+    /**
      * 지역명을 보정해 반환한다. 보정 불필요/불가 시 입력을 그대로(trim) 반환한다.
      */
     public String correct(String region) {

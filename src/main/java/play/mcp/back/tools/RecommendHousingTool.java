@@ -16,6 +16,7 @@ import play.mcp.back.domain.region.service.RegionCorrector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 청년 주거 추천 도구. 대출한도를 판정하고 그 한도 안에서 거래된 실거래 매물을 추천하며,
@@ -35,17 +36,25 @@ public class RecommendHousingTool implements McpTool {
     private static final List<String> HOUSING_TYPES = List.of("아파트", "오피스텔", "빌라");
     private static final List<String> DEAL_TYPES = List.of("전세", "월세", "매매");
 
+    /** 추천에 곁들일 관련 주거정책 개수. */
+    private static final int RELATED_POLICY_COUNT = 3;
+
     private final LoanRuleService loanRuleService;
     private final RealEstateService realEstateService;
     private final KakaoLocalService kakaoLocalService;
     private final RegionCorrector regionCorrector;
+    private final YouthPoilyTool youthPoilyTool;   // 관련 정책을 간단히 붙이기 위해 재사용
 
     /** 추천 매물 한 건 + 인근 지하철/학교. */
     public record RecommendedDeal(Deal deal, List<NearbyPlace> subways, List<NearbyPlace> schools) {
     }
 
-    /** 도구 응답. loan = 대출 판정, deals = 한도 내 추천 매물, notice = 결과가 없을 때 안내(없으면 null). */
-    public record HousingRecommendation(LoanResult loan, List<RecommendedDeal> deals, String notice) {
+    /**
+     * 도구 응답. loan = 대출 판정, deals = 한도 내 추천 매물, notice = 안내(없으면 null),
+     * relatedPolicies = 참고할 주거정책(정책번호·정책명만 간단히).
+     */
+    public record HousingRecommendation(LoanResult loan, List<RecommendedDeal> deals, String notice,
+                                        List<Map<String, Object>> relatedPolicies) {
     }
 
     @Tool(description = """
@@ -84,12 +93,19 @@ public class RecommendHousingTool implements McpTool {
         // 0-1) 입력값 검증. 잘못된 값이면 조회 없이 안내만 반환.
         String error = validate(region, housingType, dealType, age, income);
         if (error != null) {
-            return new HousingRecommendation(null, List.of(), error);
+            return new HousingRecommendation(null, List.of(), error, List.of());
         }
 
         // 0-2) 지역명 오타 보정 (법정동 API 시군구 목록과 유사도 매칭, 예: "달서그"→"달서구"). 보정 시 notice.
         String fixedRegion = regionCorrector.correct(region);
         boolean typoFixed = !fixedRegion.equals(region.trim());
+
+        // 0-3) 실재하지 않는 지역이면(예: "서울 청라동") 조회하지 말고 재입력을 안내한다.
+        if (!regionCorrector.isKnownRegion(fixedRegion)) {
+            return new HousingRecommendation(null, List.of(),
+                    "'" + region + "'은(는) 확인할 수 없는 지역이에요. 시/도와 시·군·구를 정확히 알려주시겠어요? (예: 서울 강남구, 인천 서구, 대구 수성구)",
+                    List.of());
+        }
 
         // 1) 대출한도 판정. 보증금 상한은 아직 모르므로 소득 기준 판정 후 한도만 사용.
         LoanResult loan = loanRuleService.judge(age, married, income, 0, fixedRegion);
@@ -104,7 +120,16 @@ public class RecommendHousingTool implements McpTool {
                 typoFixed ? "입력하신 지역을 '" + fixedRegion + "'로 인식했습니다." : null,
                 isSidoOnly(fixedRegion) ? "지역이 시/도 단위로 넓어 대표 지역만 조회했습니다. 정확한 결과를 위해 '구'까지 입력하세요(예: 서울 강남구)." : null,
                 buildNotice(recommended, deals, limit));
-        return new HousingRecommendation(loan, recommended, notice);
+        return new HousingRecommendation(loan, recommended, notice, relatedPolicies());
+    }
+
+    /** 참고용 주거정책을 간단히(정책번호·정책명) 붙인다. 조회 실패해도 추천은 그대로. */
+    private List<Map<String, Object>> relatedPolicies() {
+        try {
+            return youthPoilyTool.topHousingPolicies(RELATED_POLICY_COUNT);
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     /**

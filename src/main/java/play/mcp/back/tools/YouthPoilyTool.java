@@ -86,7 +86,9 @@ public class YouthPoilyTool implements McpTool {
         putIfPresent(param, "zipCd", resolveZipCd(zipCd));   // 지역명이면 법정동 시군구코드로 자동 변환
 
         BaseMap resp = callGetPlcy(param);
-        return slimResponse(filterMclsf ? filterByMclsfNm(resp, csv(mclsfNm)) : resp);
+        BaseMap out = slimResponse(filterMclsf ? filterByMclsfNm(resp, csv(mclsfNm)) : resp);
+        if (housingRelated(lclsfNm, mclsfNm, keyword)) out.put("followUp", HOUSING_FOLLOW_UP);
+        return out;
     }
 
     /** 콤마 구분 값의 각 토큰 공백을 제거하고 빈 토큰을 버린다. "일자리, 주거" → "일자리,주거". */
@@ -183,7 +185,9 @@ public class YouthPoilyTool implements McpTool {
         putIfPresent(param, "lclsfNm", lclsfNm);
         // plcyKywdNm(태그 정확일치)은 '장학금'처럼 태그가 없으면 0건이 되므로 plcyNm(정책명 부분검색)을 쓴다.
         putIfPresent(param, "plcyNm", keyword);
-        return slimResponse(callGetPlcy(param));
+        BaseMap out = slimResponse(callGetPlcy(param));
+        if (housingRelated(lclsfNm, keyword)) out.put("followUp", HOUSING_FOLLOW_UP);
+        return out;
     }
 
     @Tool(description = """
@@ -246,6 +250,45 @@ public class YouthPoilyTool implements McpTool {
 
     private String str(Object o) {
         return o == null ? null : String.valueOf(o);
+    }
+
+    /**
+     * 주거 대분류 정책을 간단히(정책번호·정책명만) 최대 limit 건 반환한다.
+     * 주거 추천 결과에 관련 정책을 가볍게 붙일 때 쓴다(다른 툴에서 호출).
+     */
+    public List<Map<String, Object>> topHousingPolicies(int limit) {
+        BaseMap param = plcyParam();
+        param.put("pageNum", "1");
+        param.put("pageSize", String.valueOf(Math.max(1, limit)));
+        param.put("lclsfNm", "주거");
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> p : extractList(callGetPlcy(param))) {
+            if (out.size() >= limit) break;
+            Map<String, Object> brief = new java.util.LinkedHashMap<>();
+            brief.put("plcyNo", p.get("plcyNo"));
+            brief.put("plcyNm", p.get("plcyNm"));
+            out.add(brief);
+        }
+        return out;
+    }
+
+    /* ───────────────────────── 후속 제안(툴 연결) ───────────────────────── */
+
+    /** 주거 관련 검색이면 매물 추천으로 이어가도록 붙이는 제안 문구. */
+    private static final String HOUSING_FOLLOW_UP =
+            "주거 관련 정책이네요! 원하시면 관심 지역과 주택유형, 나이·연소득을 알려주세요. "
+            + "대출 한도 안에서 실제 거래된 매물도 함께 추천해드릴 수 있어요(recommendHousing).";
+
+    /** 대분류·중분류·키워드에 주거 관련 단어가 있으면 참. */
+    private boolean housingRelated(String... fields) {
+        for (String f : fields) {
+            if (f == null) continue;
+            if (f.contains("주거") || f.contains("주택") || f.contains("전세") || f.contains("월세")
+                    || f.contains("전월세") || f.contains("임대") || f.contains("보증금")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /* ───────────────────────── 반환량 축소 ───────────────────────── */

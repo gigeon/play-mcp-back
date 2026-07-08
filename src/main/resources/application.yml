@@ -10,6 +10,15 @@ spring:
         type: SYNC
         protocol: STREAMABLE
         tool-change-notification: true
+        # 최초 연결 시 클라이언트/AI 에게 전달되는 안내. 대화 시작 시 사용자에게 인사·안내로 활용된다.
+        instructions: >-
+          안녕하세요! 청년 정책 & 주거 추천 도우미예요 :)
+          이렇게 도와드릴 수 있어요.
+          ① 청년 정책 찾기 — 분야(주거/일자리/교육/복지문화/참여권리)나 키워드로 검색해 드려요.
+          ② 정책 상세·신청방법·비교
+          ③ 주거 매물 추천 — 지역·예산을 알려주시면 전월세보증금대출 한도 안에서 실제 거래된 매물을 추천해 드려요.
+          먼저 관심 분야로 정책을 찾아보고, 주거라면 실제 매물 추천까지 이어서 도와드릴게요.
+          무엇을 도와드릴까요?
         streamable-http:
           mcp-endpoint: /mcp
           keep-alive-interval: 30s
