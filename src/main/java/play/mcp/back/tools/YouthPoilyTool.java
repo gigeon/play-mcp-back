@@ -29,7 +29,11 @@ public class YouthPoilyTool implements McpTool {
 
     @Tool(description = """
         청년 정책을 대분류/중분류/키워드/지역 조건으로 검색한다.
-        사용자가 특정 분야·조건의 청년 지원 정책 목록을 찾을 때 사용한다. 조건이 없으면 전체 검색.
+        사용자가 특정 분야·조건의 청년 지원 정책 목록을 찾을 때 사용한다.
+
+        [안내] 요청이 막연하면(예: "청년정책 알려줘") 바로 전체를 보여드리기보다 먼저 다정하게 여쭤봐 주세요.
+        이렇게요: "어떤 분야가 궁금하세요? 주거·일자리·교육·복지문화·참여권리 중에서요. 관심 키워드(예: 대출, 장학금)나
+        지역이 있으면 함께 알려주시면 딱 맞게 찾아드릴게요 :)" 조건이 최소 하나 정해지면 검색해 주세요.
 
         [입력 규칙 — 중요]
         - lclsfNm/mclsfNm/keyword 는 아래 '가능한 값' 목록에 있는 단어만 유효하다. 목록에 없는 임의어를 넣으면 결과가 0건이 될 수 있으니, 사용자의 자연어를 목록의 정확한 단어로 매핑해서 넣어라.
@@ -82,7 +86,7 @@ public class YouthPoilyTool implements McpTool {
         putIfPresent(param, "zipCd", resolveZipCd(zipCd));   // 지역명이면 법정동 시군구코드로 자동 변환
 
         BaseMap resp = callGetPlcy(param);
-        return filterMclsf ? filterByMclsfNm(resp, csv(mclsfNm)) : resp;
+        return slimResponse(filterMclsf ? filterByMclsfNm(resp, csv(mclsfNm)) : resp);
     }
 
     /** 콤마 구분 값의 각 토큰 공백을 제거하고 빈 토큰을 버린다. "일자리, 주거" → "일자리,주거". */
@@ -150,6 +154,11 @@ public class YouthPoilyTool implements McpTool {
 
     @Tool(description = """
         분야/키워드로 청년정책 후보 목록을 조회한다. (나이·결혼여부로 서버에서 거르지는 않는다.)
+
+        [안내] 어떤 분야·키워드인지 분명하지 않으면 바로 찾기보다 먼저 상냥하게 여쭤봐 주세요.
+        "어떤 분야나 키워드로 찾아드릴까요? 나이랑 결혼 여부도 알려주시면 조건에 맞는 것만 쏙 골라드릴게요 :)"
+        처럼요. (나이·결혼여부는 결과를 걸러 안내하는 데 쓰여요)
+
         반환된 각 정책의 지원연령·결혼조건 필드를 보고, 사용자의 나이·결혼여부에 맞는 것만 AI가 직접 골라 안내하라.
           - 지원연령: sprtTrgtMinAge ~ sprtTrgtMaxAge (sprtTrgtAgeLmtYn=N 이면 연령 제한 없음 → 모두 대상)
           - 결혼조건 mrgSttsCd: 0055001=기혼 / 0055002=미혼 / 0055003=제한없음
@@ -174,7 +183,7 @@ public class YouthPoilyTool implements McpTool {
         putIfPresent(param, "lclsfNm", lclsfNm);
         // plcyKywdNm(태그 정확일치)은 '장학금'처럼 태그가 없으면 0건이 되므로 plcyNm(정책명 부분검색)을 쓴다.
         putIfPresent(param, "plcyNm", keyword);
-        return callGetPlcy(param);
+        return slimResponse(callGetPlcy(param));
     }
 
     @Tool(description = """
@@ -206,8 +215,12 @@ public class YouthPoilyTool implements McpTool {
                 if (plcyNo.isEmpty()) continue;
                 if (!isValidPlcyNo(plcyNo)) { invalid.add(plcyNo); continue; }   // 형식 오류(특수문자 등)
                 List<Map<String, Object>> one = extractList(policyDetail(plcyNo));
-                if (one.isEmpty()) invalid.add(plcyNo);   // 조회 결과 없음 = 잘못된 정책번호
-                else policies.addAll(one);
+                if (one.isEmpty()) {
+                    invalid.add(plcyNo);   // 조회 결과 없음 = 잘못된 정책번호
+                } else {
+                    one.forEach(p -> p.remove("zipCd"));   // 거대 필드 제거로 반환량 축소
+                    policies.addAll(one);
+                }
             }
         }
         BaseMap out = new BaseMap();
@@ -233,6 +246,53 @@ public class YouthPoilyTool implements McpTool {
 
     private String str(Object o) {
         return o == null ? null : String.valueOf(o);
+    }
+
+    /* ───────────────────────── 반환량 축소 ───────────────────────── */
+
+    /** 목록 응답에서 각 정책에 남길 핵심 필드. 거대한 zipCd·긴 본문 등은 제외해 반환량을 줄인다. */
+    private static final List<String> SLIM_FIELDS = List.of(
+            "plcyNo", "plcyNm", "lclsfNm", "mclsfNm", "plcyKywdNm", "plcyExplnCn",
+            "sprtTrgtMinAge", "sprtTrgtMaxAge", "sprtTrgtAgeLmtYn",
+            "mrgSttsCd", "earnCndSeCd", "earnMinAmt", "earnMaxAmt",
+            "aplyYmd", "aplyPrdSeCd", "sprvsnInstCdNm");
+
+    /** 정책 한 건을 핵심 필드만 남겨 슬림화한다(목록 툴용). */
+    private Map<String, Object> slim(Map<String, Object> p) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        for (String f : SLIM_FIELDS) {
+            if (p.containsKey(f)) m.put(f, p.get(f));
+        }
+        return m;
+    }
+
+    /** 목록 툴이 한 번에 반환하는 최대 건수(반환량 상한). 더 필요하면 조건을 좁혀 재검색. */
+    private static final int MAX_LIST = 30;
+
+    /** 응답의 youthPolicyList 를 핵심 필드만 남기고 최대 {@link #MAX_LIST} 건으로 줄인다(목록 툴용). */
+    @SuppressWarnings("unchecked")
+    private BaseMap slimResponse(BaseMap resp) {
+        if (resp.get("result") instanceof Map<?, ?> result) {
+            Map<String, Object> r = (Map<String, Object>) result;
+            if (r.get("youthPolicyList") instanceof List<?> list) {
+                List<Map<String, Object>> slimmed = new ArrayList<>();
+                for (Object o : list) {
+                    if (slimmed.size() >= MAX_LIST) break;
+                    if (o instanceof Map<?, ?> p) slimmed.add(slim((Map<String, Object>) p));
+                }
+                r.put("youthPolicyList", slimmed);
+                r.put("returnedCount", slimmed.size());   // 실제 반환 건수(전체는 pagging.totCount)
+            }
+        }
+        return resp;
+    }
+
+    /** 상세 응답에서 거대한 필드(zipCd: 대상 시군구 코드 수백 개)만 제거한다(상세 툴용). */
+    private BaseMap stripHeavy(BaseMap resp) {
+        for (Map<String, Object> p : extractList(resp)) {
+            p.remove("zipCd");
+        }
+        return resp;
     }
 
     /* ───────────────────────── 요청 헬퍼 ───────────────────────── */
@@ -283,7 +343,7 @@ public class YouthPoilyTool implements McpTool {
             err.put("error", "제대로된 정책번호가 아닙니다: " + plcyNo);
             return err;
         }
-        return resp;
+        return stripHeavy(resp);   // 거대한 zipCd 제거로 반환량 축소(신청방법 등 상세는 유지)
     }
 
     /* ───────────────────────── 파싱 헬퍼 ───────────────────────── */
