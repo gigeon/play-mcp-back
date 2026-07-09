@@ -1,12 +1,11 @@
 package play.mcp.back.tools;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import play.mcp.back.common.BaseMap;
-import play.mcp.back.common.McpTool;
 import play.mcp.back.domain.api.service.ApiService;
 import play.mcp.back.domain.region.service.RegionCodeService;
 
@@ -16,7 +15,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class YouthPoilyTool implements McpTool {
+public class YouthPoilyTool {
 
     private final ApiService apiService;
     private final RegionCodeService regionCodeService;
@@ -27,7 +26,8 @@ public class YouthPoilyTool implements McpTool {
     @Value("${api.youth.key}")
     private String apiKey;
 
-    @Tool(description = """
+    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원]
         청년정책을 분야·중분류·키워드·지역으로 검색한다.
         요청이 막연하면("청년정책 알려줘") 바로 검색하지 말고 관심 분야/키워드/지역을 먼저 물어본 뒤, 조건이 하나라도 정해지면 검색한다.
         - lclsfNm/mclsfNm/keyword 는 각 파라미터의 '가능한 값' 목록 단어만 유효 — 사용자 자연어를 그 단어로 매핑해 넣어라(없는 임의어는 0건 위험). 예: "알바"→일자리, "집"→주거, "전세대출"→대출.
@@ -35,13 +35,13 @@ public class YouthPoilyTool implements McpTool {
         - 상세는 결과 plcyNo 로 getPolicyDetail 호출.
         """)
     public BaseMap searchPolicy(
-            @ToolParam(description = """
+            @McpToolParam(description = """
                 정책 대분류. 목록의 단어만 사용. 여러 개면 콤마 구분(공백없이).
                 가능한 값: 일자리 | 주거 | 교육 | 복지문화 | 참여권리
                 예: "주거"  또는  "주거,일자리"
                 """, required = false)
             String lclsfNm,
-            @ToolParam(description = """
+            @McpToolParam(description = """
                 정책 중분류. 목록의 단어만 사용(공백 포함 값은 통째로 하나의 토큰 — "주택,및,거주지" 아님).
                 ※ 중요: mclsfNm 은 서버가 아닌 조회 결과에서 걸러지므로, 반드시 그 중분류가 속한 lclsfNm 도 함께 지정하라.
                   (예: mclsfNm="주택 및 거주지" → lclsfNm="주거" 함께 지정) lclsfNm 없이 mclsfNm 만 주면 결과가 누락된다.
@@ -52,7 +52,7 @@ public class YouthPoilyTool implements McpTool {
                 여러 개면 콤마 구분. 예: "주택 및 거주지"  (O)   /   "주택,및,거주지" (X)
                 """, required = false)
             String mclsfNm,
-            @ToolParam(description = """
+            @McpToolParam(description = """
                 정책 키워드 태그. 목록의 단어만 사용. 여러 개면 콤마 구분(공백없이).
                 가능한 값: 대출 | 보조금 | 바우처 | 금리혜택 | 교육지원 |
                 맞춤형상담서비스 | 인턴 | 벤처 | 중소기업 | 청년가장 |
@@ -60,7 +60,7 @@ public class YouthPoilyTool implements McpTool {
                 예: "대출"  또는  "대출,보조금"
                 """, required = false)
             String keyword,
-            @ToolParam(description = """
+            @McpToolParam(description = """
                 지역 필터(선택). 사용자가 말한 지역 표현을 그대로 넣어라. 코드를 직접 계산하거나 지어내지 말 것.
                 내부에서 법정시군구코드(5자리)로 자동 변환한다.
                 '시/도 시/군/구' 형식이 가장 정확하다(예: "서울 강남구"). 동/번지가 붙어도 시군구 단위로 처리된다.
@@ -167,7 +167,8 @@ public class YouthPoilyTool implements McpTool {
         return resp;
     }
 
-    @Tool(description = """
+    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원]
         분야/키워드로 청년정책 후보를 조회한다(나이·결혼으로 서버 필터는 안 함).
         분야·키워드가 불명확하면 먼저 물어본다(나이·결혼여부도 받으면 결과를 걸러 안내 가능).
         반환된 각 정책의 지원연령(sprtTrgtMinAge~sprtTrgtMaxAge, sprtTrgtAgeLmtYn=N이면 무관)과
@@ -175,13 +176,13 @@ public class YouthPoilyTool implements McpTool {
         최대 50건 반환 — 많으면 lclsfNm/keyword 로 좁혀 호출.
         """)
     public BaseMap findMyPolicy(
-            @ToolParam(description = """
+            @McpToolParam(description = """
                 관심 분야 대분류(선택). 아래 목록의 단어만 유효 — 사용자 자연어를 목록 단어로 매핑해 넣어라.
                 가능한 값: 일자리 | 주거 | 교육 | 복지문화 | 참여권리
                 여러 개면 콤마 구분(공백없이). 예: "주거" 또는 "주거,교육"
                 """, required = false)
             String lclsfNm,
-            @ToolParam(description = """
+            @McpToolParam(description = """
                 관심 키워드(선택). 정책명(plcyNm) 부분검색이라 목록에 없는 자유어도 가능하다.
                 예: 장학금 | 전세 | 월세 | 면접  (한 단어 위주로 넣는 게 정확)
                 """, required = false)
@@ -198,7 +199,8 @@ public class YouthPoilyTool implements McpTool {
         return out;
     }
 
-    @Tool(description = """
+    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원]
         정책 번호(plcyNo)로 정책 하나의 전체 상세 정보를 조회한다.
         검색이나 맞춤조회로 얻은 정책번호를 넣어 사용한다.
         응답 코드값 의미: mrgSttsCd(결혼) 0055001=기혼/0055002=미혼/0055003=제한없음,
@@ -206,18 +208,19 @@ public class YouthPoilyTool implements McpTool {
         aplyPrdSeCd(신청기간) 0057001=특정기간/0057002=상시/0057003=마감.
         """)
     public BaseMap getPolicyDetail(
-            @ToolParam(description = "정책 번호") String plcyNo
+            @McpToolParam(description = "정책 번호") String plcyNo
     ) {
         return policyDetailOrError(plcyNo);
     }
 
-    @Tool(description = """
+    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원]
         여러 정책을 한 번에 비교할 때 사용한다. 콤마로 구분한 정책번호들을 받아
         각각의 상세를 조회해 목록으로 반환하므로, AI가 지원내용·연령·소득조건 등 차이를 정리한다.
         정책번호 하나만 넣으면 그 정책 상세만 반환한다.
         """)
     public BaseMap comparePolicy(
-            @ToolParam(description = "비교할 정책 번호들. 여러 개면 콤마로 구분 (예: 2026...,2026...)") String plcyNos
+            @McpToolParam(description = "비교할 정책 번호들. 여러 개면 콤마로 구분 (예: 2026...,2026...)") String plcyNos
     ) {
         List<Map<String, Object>> policies = new ArrayList<>();
         List<String> invalid = new ArrayList<>();
@@ -245,13 +248,14 @@ public class YouthPoilyTool implements McpTool {
         return out;
     }
 
-    @Tool(description = """
+    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원]
         정책의 신청 방법을 안내할 때 사용한다. 정책번호로 상세를 조회하며,
         응답의 신청방법(plcyAplyMthdCn), 제출서류(sbmsnDcmntCn),
         신청URL(aplyUrlAddr), 심사방법(srngMthdCn)을 참고해 안내한다.
         """)
     public BaseMap getApplyGuide(
-            @ToolParam(description = "정책 번호") String plcyNo
+            @McpToolParam(description = "정책 번호") String plcyNo
     ) {
         return policyDetailOrError(plcyNo);
     }

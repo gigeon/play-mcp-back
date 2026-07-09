@@ -1,10 +1,9 @@
 package play.mcp.back.tools;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
+import org.springaicommunity.mcp.annotation.McpTool;
+import org.springaicommunity.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Service;
-import play.mcp.back.common.McpTool;
 import play.mcp.back.domain.kakao.model.NearbyPlace;
 import play.mcp.back.domain.kakao.service.KakaoLocalService;
 import play.mcp.back.domain.loan.service.LoanRuleService;
@@ -24,7 +23,7 @@ import java.util.Map;
  */
 @Service
 @RequiredArgsConstructor
-public class RecommendHousingTool implements McpTool {
+public class RecommendHousingTool {
 
     /** 반경(m) 및 반환 개수 상수. 지하철은 역이 드문 신도시(청라 등) 대응으로 더 넓게 잡는다. */
     private static final int SUBWAY_RADIUS_M = 3000;
@@ -57,8 +56,13 @@ public class RecommendHousingTool implements McpTool {
                                         List<Map<String, Object>> relatedPolicies) {
     }
 
-    @Tool(description = """
-        청년 주거 추천. 전월세보증금대출 한도를 판정하고 그 한도 내 실거래 매물 + 인근 지하철역/학교를 추천한다.
+    @McpTool(
+        title = "청년올인원 주거 추천",
+        annotations = @McpTool.McpAnnotations(
+                title = "청년올인원 주거 추천",
+                readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true),
+        description = """
+        [청년올인원] 청년 주거 추천. 전월세보증금대출 한도를 판정하고 그 한도 내 실거래 매물 + 인근 지하철역/학교를 추천한다.
         주의: 실거래가는 과거 거래이며 현재 매물이 아니다. 금액 단위는 만원.
         아래 6개(region/housingType/dealType/age/married/income)가 모두 필요하다.
         빠진 값은 추측하지 말고 사용자에게 먼저 물어본 뒤 호출하라.
@@ -72,12 +76,12 @@ public class RecommendHousingTool implements McpTool {
         income: 연소득(만원)
     """)
     public HousingRecommendation recommendHousing(
-            @ToolParam(description = "지역 (예: 서울, 서울 강남구)") String region,
-            @ToolParam(description = "주택유형: 아파트/오피스텔/빌라") String housingType,
-            @ToolParam(description = "거래유형: 전세/월세/매매") String dealType,
-            @ToolParam(description = "나이(만)") int age,
-            @ToolParam(description = "혼인 여부: 기혼이면 true, 미혼이면 false") boolean married,
-            @ToolParam(description = "연소득(만원)") int income
+            @McpToolParam(required = true, description = "지역 (예: 서울, 서울 강남구)") String region,
+            @McpToolParam(required = true, description = "주택유형: 아파트/오피스텔/빌라") String housingType,
+            @McpToolParam(required = true, description = "거래유형: 전세/월세/매매") String dealType,
+            @McpToolParam(required = true, description = "나이(만)") int age,
+            @McpToolParam(required = true, description = "혼인 여부: 기혼이면 true, 미혼이면 false") boolean married,
+            @McpToolParam(required = true, description = "연소득(만원)") int income
     ) {
         // 0-1) 입력값 검증. 잘못된 값이면 조회 없이 안내만 반환.
         String error = validate(region, housingType, dealType, age, income);
