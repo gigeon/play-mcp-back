@@ -62,7 +62,7 @@ public class RecommendHousingTool {
                 title = "청년올인원 주거 추천",
                 readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true),
         description = """
-        [청년올인원] 청년 주거 추천. 전월세보증금대출 한도를 판정하고 그 한도 내 실거래 매물 + 인근 지하철역/학교를 추천한다.
+        [청년올인원 주거 추천] 청년 주거 추천. 전월세보증금대출 한도를 판정하고 그 한도 내 실거래 매물 + 인근 지하철역/학교를 추천한다.
         주의: 실거래가는 과거 거래이며 현재 매물이 아니다. 금액 단위는 만원.
         아래 6개(region/housingType/dealType/age/married/income)가 모두 필요하다.
         빠진 값은 추측하지 말고 사용자에게 먼저 물어본 뒤 호출하라.

@@ -26,12 +26,16 @@ public class YouthPoilyTool {
     @Value("${api.youth.key}")
     private String apiKey;
 
-    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
-        [청년올인원]
-        청년정책을 분야·중분류·키워드·지역으로 검색한다.
+    @McpTool(title = "청년올인원 정책검색", annotations = @McpTool.McpAnnotations(title = "청년올인원 정책검색", readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원 정책검색]
+        청년정책을 분야·중분류·키워드·지역으로 검색하는 통합 검색 도구.
+        (분야/키워드로 찾기 + 사용자 나이·결혼여부에 맞는 정책 고르기까지 이 도구 하나로 처리한다.)
         요청이 막연하면("청년정책 알려줘") 바로 검색하지 말고 관심 분야/키워드/지역을 먼저 물어본 뒤, 조건이 하나라도 정해지면 검색한다.
-        - lclsfNm/mclsfNm/keyword 는 각 파라미터의 '가능한 값' 목록 단어만 유효 — 사용자 자연어를 그 단어로 매핑해 넣어라(없는 임의어는 0건 위험). 예: "알바"→일자리, "집"→주거, "전세대출"→대출.
+        - lclsfNm/mclsfNm 은 각 파라미터의 '가능한 값' 목록 단어만 유효 — 사용자 자연어를 그 단어로 매핑해 넣어라. 예: "알바"→일자리, "집"→주거.
+        - keyword 는 정책명 부분검색이라 자유어도 가능(예: 장학금, 전세).
         - 여러 값은 콤마 구분, 값 안에는 콤마 금지("주택 및 거주지"는 하나의 토큰).
+        - 나이·결혼여부 조건이 있으면: 반환된 각 정책의 지원연령(sprtTrgtMinAge~sprtTrgtMaxAge, sprtTrgtAgeLmtYn=N이면 무관)과
+          결혼조건(mrgSttsCd: 0055001기혼/0055002미혼/0055003무관)을 보고 AI가 조건에 맞는 것만 골라 안내하라.
         - 상세는 결과 plcyNo 로 getPolicyDetail 호출.
         """)
     public BaseMap searchPolicy(
@@ -53,11 +57,8 @@ public class YouthPoilyTool {
                 """, required = false)
             String mclsfNm,
             @McpToolParam(description = """
-                정책 키워드 태그. 목록의 단어만 사용. 여러 개면 콤마 구분(공백없이).
-                가능한 값: 대출 | 보조금 | 바우처 | 금리혜택 | 교육지원 |
-                맞춤형상담서비스 | 인턴 | 벤처 | 중소기업 | 청년가장 |
-                장기미취업청년 | 공공임대주택 | 신용회복 | 육아 | 출산 | 해외진출 | 주거지원
-                예: "대출"  또는  "대출,보조금"
+                키워드(선택). 정책명(plcyNm) 부분검색이라 목록에 없는 자유어도 가능하다.
+                예: 장학금 | 전세 | 월세 | 대출 | 면접  (한 단어 위주가 정확)
                 """, required = false)
             String keyword,
             @McpToolParam(description = """
@@ -72,9 +73,10 @@ public class YouthPoilyTool {
         BaseMap param = plcyParam();
         param.put("pageNum", "1");
         // 중분류는 API 가 공백 포함 값을 필터 못 해 클라이언트에서 거르므로 넉넉히 받는다.
-        param.put("pageSize", filterMclsf ? "100" : "10");
+        param.put("pageSize", filterMclsf ? "100" : "30");
         putIfPresent(param, "lclsfNm", csv(lclsfNm));        // "일자리, 주거" → "일자리,주거" (콤마 뒤 공백 제거)
-        putIfPresent(param, "plcyKywdNm", csv(keyword));
+        // keyword 는 plcyNm(정책명 부분검색). plcyKywdNm(태그 정확일치)은 '장학금'처럼 태그 없으면 0건이라 안 씀.
+        putIfPresent(param, "plcyNm", csv(keyword));
         ZipResult zip = resolveZipCd(zipCd);                 // 지역명이면 법정동 시군구코드로 자동 변환
         putIfPresent(param, "zipCd", zip.codes());
 
@@ -167,40 +169,8 @@ public class YouthPoilyTool {
         return resp;
     }
 
-    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
-        [청년올인원]
-        분야/키워드로 청년정책 후보를 조회한다(나이·결혼으로 서버 필터는 안 함).
-        분야·키워드가 불명확하면 먼저 물어본다(나이·결혼여부도 받으면 결과를 걸러 안내 가능).
-        반환된 각 정책의 지원연령(sprtTrgtMinAge~sprtTrgtMaxAge, sprtTrgtAgeLmtYn=N이면 무관)과
-        결혼조건(mrgSttsCd: 0055001기혼/0055002미혼/0055003무관)을 보고 AI가 맞는 것만 골라 안내하라.
-        최대 50건 반환 — 많으면 lclsfNm/keyword 로 좁혀 호출.
-        """)
-    public BaseMap findMyPolicy(
-            @McpToolParam(description = """
-                관심 분야 대분류(선택). 아래 목록의 단어만 유효 — 사용자 자연어를 목록 단어로 매핑해 넣어라.
-                가능한 값: 일자리 | 주거 | 교육 | 복지문화 | 참여권리
-                여러 개면 콤마 구분(공백없이). 예: "주거" 또는 "주거,교육"
-                """, required = false)
-            String lclsfNm,
-            @McpToolParam(description = """
-                관심 키워드(선택). 정책명(plcyNm) 부분검색이라 목록에 없는 자유어도 가능하다.
-                예: 장학금 | 전세 | 월세 | 면접  (한 단어 위주로 넣는 게 정확)
-                """, required = false)
-            String keyword
-    ) {
-        BaseMap param = plcyParam();
-        param.put("pageNum", "1");
-        param.put("pageSize", "50");
-        putIfPresent(param, "lclsfNm", lclsfNm);
-        // plcyKywdNm(태그 정확일치)은 '장학금'처럼 태그가 없으면 0건이 되므로 plcyNm(정책명 부분검색)을 쓴다.
-        putIfPresent(param, "plcyNm", keyword);
-        BaseMap out = slimResponse(callGetPlcy(param));
-        if (housingRelated(lclsfNm, keyword)) out.put("followUp", HOUSING_FOLLOW_UP);
-        return out;
-    }
-
-    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
-        [청년올인원]
+    @McpTool(title = "청년올인원 정책상세", annotations = @McpTool.McpAnnotations(title = "청년올인원 정책상세", readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원 정책상세]
         정책 번호(plcyNo)로 정책 하나의 전체 상세 정보를 조회한다.
         검색이나 맞춤조회로 얻은 정책번호를 넣어 사용한다.
         응답 코드값 의미: mrgSttsCd(결혼) 0055001=기혼/0055002=미혼/0055003=제한없음,
@@ -213,8 +183,8 @@ public class YouthPoilyTool {
         return policyDetailOrError(plcyNo);
     }
 
-    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
-        [청년올인원]
+    @McpTool(title = "청년올인원 정책비교", annotations = @McpTool.McpAnnotations(title = "청년올인원 정책비교", readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원 정책비교]
         여러 정책을 한 번에 비교할 때 사용한다. 콤마로 구분한 정책번호들을 받아
         각각의 상세를 조회해 목록으로 반환하므로, AI가 지원내용·연령·소득조건 등 차이를 정리한다.
         정책번호 하나만 넣으면 그 정책 상세만 반환한다.
@@ -248,8 +218,8 @@ public class YouthPoilyTool {
         return out;
     }
 
-    @McpTool(title = "청년올인원", annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
-        [청년올인원]
+    @McpTool(title = "청년올인원 신청안내", annotations = @McpTool.McpAnnotations(title = "청년올인원 신청안내", readOnlyHint = true, destructiveHint = false, idempotentHint = true, openWorldHint = true), description = """
+        [청년올인원 신청안내]
         정책의 신청 방법을 안내할 때 사용한다. 정책번호로 상세를 조회하며,
         응답의 신청방법(plcyAplyMthdCn), 제출서류(sbmsnDcmntCn),
         신청URL(aplyUrlAddr), 심사방법(srngMthdCn)을 참고해 안내한다.
